@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { 
   ShoppingCart, 
   Package, 
@@ -11,8 +11,57 @@ import {
   ShieldCheck,
   ShieldAlert
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function EcommerceAdmin() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  useEffect(() => {
+    async function fetchData() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setErrorMsg("No active session");
+        return;
+      }
+      
+      const token = session.access_token;
+      
+      try {
+        // Fetch all 3 endpoints concurrently
+        const [prodRes, ordRes, custRes] = await Promise.all([
+          fetch("http://localhost:3000/api/products", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch("http://localhost:3000/api/orders", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch("http://localhost:3000/api/customers", {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+        ]);
+        
+        // Handle common unauthorized / MFA issues
+        if (!prodRes.ok) {
+           const errData = await prodRes.json().catch(() => ({}));
+           throw new Error(errData.error || `Gateway returned ${prodRes.status}`);
+        }
+        
+        setProducts(await prodRes.json());
+        if (ordRes.ok) setOrders(await ordRes.json());
+        if (custRes.ok) setCustomers(await custRes.json());
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      }
+    }
+    
+    fetchData();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -30,11 +79,17 @@ export default function EcommerceAdmin() {
         </div>
       </div>
 
-      {/* Access Control Notice */}
-      <div className="bg-neon-green/10 border border-neon-green/30 text-neon-green p-3 rounded-lg flex items-center gap-3 shadow-[0_0_10px_rgba(0,255,65,0.05)]">
-        <ShieldCheck className="w-5 h-5" />
-        <span className="text-sm font-medium">Session Validated: Admin capabilities enabled. No immediate risks detected by the Zero Trust Gateway.</span>
-      </div>
+      {errorMsg ? (
+        <div className="bg-neon-red/10 border border-neon-red/30 text-neon-red p-3 rounded-lg flex items-center gap-3">
+          <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Gateway Blocked: {errorMsg}</span>
+        </div>
+      ) : (
+        <div className="bg-neon-green/10 border border-neon-green/30 text-neon-green p-3 rounded-lg flex items-center gap-3 shadow-[0_0_10px_rgba(0,255,65,0.05)]">
+          <ShieldCheck className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Session Validated: Admin capabilities enabled. No immediate risks detected by the Zero Trust Gateway.</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -44,18 +99,18 @@ export default function EcommerceAdmin() {
             <Package className="w-5 h-5 text-slate-400" /> Products
           </h3>
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex items-center justify-between bg-dark-bg p-3 rounded-lg border border-dark-border">
+            {products.length > 0 ? products.map((p, i) => (
+              <div key={p.id || i} className="flex items-center justify-between bg-dark-bg p-3 rounded-lg border border-dark-border">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-800 rounded flex-shrink-0"></div>
+                  <div className="w-10 h-10 bg-slate-800 rounded flex-shrink-0 flex items-center justify-center text-xs text-slate-500">Img</div>
                   <div>
-                    <p className="text-sm text-white font-medium">Cyber Deck Pro v{i}</p>
-                    <p className="text-xs text-slate-500">In Stock: {i * 12}</p>
+                    <p className="text-sm text-white font-medium">{p.name || `Product ${i}`}</p>
+                    <p className="text-xs text-slate-500">Price: ${p.price}</p>
                   </div>
                 </div>
                 <button className="text-xs text-neon-blue hover:underline">Edit</button>
               </div>
-            ))}
+            )) : <p className="text-sm text-slate-500 flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-neon-red"/> Access denied or no data</p>}
           </div>
         </div>
 
@@ -65,15 +120,15 @@ export default function EcommerceAdmin() {
             <ShoppingCart className="w-5 h-5 text-slate-400" /> Orders
           </h3>
           <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex items-center justify-between bg-dark-bg p-3 rounded-lg border border-dark-border">
+            {orders.length > 0 ? orders.map((o, i) => (
+              <div key={o.id || i} className="flex items-center justify-between bg-dark-bg p-3 rounded-lg border border-dark-border">
                 <div>
-                  <p className="text-sm text-white font-mono">ORD-00{i}</p>
-                  <p className="text-xs text-slate-500">Pending Shipment</p>
+                  <p className="text-sm text-white font-mono">ORD-{o.id?.substring(0,6) || `00${i}`}</p>
+                  <p className="text-xs text-slate-500">{o.status || 'Pending'}</p>
                 </div>
-                <span className="text-sm font-bold text-slate-300">${199 * i}.00</span>
+                <span className="text-sm font-bold text-slate-300">${o.total_amount || 0}.00</span>
               </div>
-            ))}
+            )) : <p className="text-sm text-slate-500 flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-neon-red"/> Access denied or no data</p>}
           </div>
         </div>
 
@@ -83,22 +138,18 @@ export default function EcommerceAdmin() {
             <Users className="w-5 h-5 text-slate-400" /> Customers Database
           </h3>
           <div className="space-y-3">
-            {[
-              { n: "Alice D.", e: "alice@corp.net", r: "Low Risk" },
-              { n: "Bob S.", e: "b.smith@gmail.com", r: "Medium Risk" },
-              { n: "Charlie P.", e: "cp_admin@test.io", r: "High Risk" }
-            ].map((c, i) => (
-              <div key={i} className="flex items-center justify-between bg-dark-bg p-3 rounded-lg border border-dark-border">
+            {customers.length > 0 ? customers.map((c, i) => (
+              <div key={c.id || i} className="flex items-center justify-between bg-dark-bg p-3 rounded-lg border border-dark-border">
                 <div>
-                  <p className="text-sm text-white font-medium">{c.n}</p>
-                  <p className="text-xs text-slate-500">{c.e}</p>
+                  <p className="text-sm text-white font-medium">{c.full_name || `Customer ${i}`}</p>
+                  <p className="text-xs text-slate-500">{c.email}</p>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   {i === 2 && <ShieldAlert className="w-3 h-3 text-neon-red" />}
-                  <span className={`${i === 2 ? "text-neon-red" : "text-slate-400"}`}>{c.r}</span>
+                  <span className={`${i === 2 ? "text-neon-red" : "text-slate-400"}`}>{i === 2 ? "High Risk" : "Low Risk"}</span>
                 </div>
               </div>
-            ))}
+            )) : <p className="text-sm text-slate-500 flex items-center gap-2"><ShieldAlert className="w-4 h-4 text-neon-red"/> Access denied or no data</p>}
           </div>
         </div>
       </div>

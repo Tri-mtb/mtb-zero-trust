@@ -4,6 +4,7 @@ const cors = require('cors');
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
 const parser = require('ua-parser-js');
+const geoip = require('geoip-lite');
 
 const app = express();
 app.use(express.json());
@@ -28,6 +29,16 @@ app.use(async (req, res, next) => {
         return res.status(401).json({ error: 'No token provided' });
     }
 
+    try {
+        // Decode JWT payload to check MFA status (aal2)
+        const tokenPayload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
+        if (tokenPayload.aal !== 'aal2') {
+            return res.status(403).json({ error: 'MFA (2FA) Verification Required. Access Denied.' });
+        }
+    } catch (e) {
+        return res.status(400).json({ error: 'Invalid token format.' });
+    }
+
     // Verify JWT with Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
@@ -46,10 +57,17 @@ app.use(async (req, res, next) => {
 
     // 2. Collect Context
     const ua = parser(req.headers['user-agent']);
+    const ip = req.ip || req.connection.remoteAddress;
+    
+    // Look up location using geoip-lite
+    const geo = geoip.lookup(ip);
+    const geolocation = geo ? `${geo.country}/${geo.city}` : 'Unknown';
+
     const context = {
         user_id: user.id,
         role: role,
-        ip_address: req.ip || req.connection.remoteAddress,
+        ip_address: ip,
+        geolocation: geolocation,
         device_fingerprint: `${ua.os.name} ${ua.os.version} - ${ua.browser.name}`,
         time: new Date().toISOString(),
         endpoint: req.originalUrl,
@@ -97,7 +115,7 @@ app.use(async (req, res, next) => {
 });
 
 // Proxy routes to Protected API
-app.use('*', async (req, res) => {
+app.all('/{*path}', async (req, res) => {
     try {
         const url = `${PROTECTED_API_URL}${req.originalUrl}`;
         const targetReq = {

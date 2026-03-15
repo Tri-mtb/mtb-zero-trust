@@ -1,28 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
-import { Shield, Lock, Fingerprint, ChevronRight } from "lucide-react";
-import { useRouter } from "next/navigation";
+import React from "react";
+import { Shield, Lock, Fingerprint } from "lucide-react";
+import LoginForm from "./LoginForm";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [step, setStep] = useState<"credentials" | "mfa">("credentials");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [mfaCode, setMfaCode] = useState("");
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (step === "credentials") {
-      setStep("mfa");
-    } else {
-      // Mock routing based on email role convention for demo
-      if (email.includes("sales")) router.push("/sales/dashboard");
-      else if (email.includes("shipper")) router.push("/shipper/dashboard");
-      else router.push("/admin/dashboard");
-    }
-  };
-
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Cyber Effect */}
@@ -46,64 +28,7 @@ export default function LoginPage() {
             AI-Enhanced Zero Trust E-commerce Platform. Please authenticate to proceed.
           </p>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            {step === "credentials" ? (
-              <>
-                <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Enterprise Email</label>
-                  <div className="relative">
-                    <input 
-                      type="email" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@trustguard.ai" 
-                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Password</label>
-                  <div className="relative">
-                    <input 
-                      type="password" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••" 
-                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-3 text-white focus:outline-none focus:border-neon-blue focus:ring-1 focus:ring-neon-blue transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-1 animate-in fade-in slide-in-from-right-4 duration-300">
-                <label className="text-xs uppercase tracking-wider text-neon-purple font-semibold flex items-center gap-2">
-                  <Fingerprint className="w-4 h-4" /> 2FA Verification
-                </label>
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value)}
-                    placeholder="Enter 6-digit MFA Code" 
-                    className="w-full bg-dark-bg border border-neon-purple/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-neon-purple focus:ring-1 focus:ring-neon-purple transition-all tracking-widest text-center text-lg neon-border-blue"
-                    required
-                    maxLength={6}
-                  />
-                </div>
-                <p className="text-xs text-slate-500 mt-2 text-center">Open your authenticator app to view your code.</p>
-              </div>
-            )}
-
-            <button 
-              type="submit" 
-              className="w-full bg-neon-blue hover:bg-cyan-400 text-dark-bg font-bold rounded-lg px-4 py-3 transition-colors flex items-center justify-center gap-2 mt-4"
-            >
-              {step === "credentials" ? "Verify Credentials" : "Authorize Access"}
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </form>
+          <LoginForm />
 
           <p className="text-xs text-slate-500 mt-8 flex items-center gap-2 justify-center">
             <Lock className="w-3 h-3 text-neon-green" /> 

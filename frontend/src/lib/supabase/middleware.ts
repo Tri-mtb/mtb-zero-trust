@@ -27,10 +27,6 @@ export async function updateSession(request: NextRequest) {
         }
     )
 
-    // IMPORTANT: Avoid writing any logic between createServerClient and
-    // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-    // issues with cross-site request forgery attacks.
-    // Do not use supabase.auth.getSession(), it is not secure.
     const {
         data: { user },
     } = await supabase.auth.getUser()
@@ -39,29 +35,33 @@ export async function updateSession(request: NextRequest) {
     const isAuthRoute = unprotectedRoutes.includes(request.nextUrl.pathname)
 
     if (!user && !isAuthRoute) {
-        // If the user is missing and they are not navigating to an unprotected route,
-        // redirect them to the login page. (Zero Trust: deny by default)
         const url = request.nextUrl.clone()
         url.pathname = '/login'
         return NextResponse.redirect(url)
     }
 
-    // If user is logged in, and tries to go to login page, redirect them to dashboard
+    // If user is logged in and tries to go to login page, redirect to their role-based dashboard
     if (user && isAuthRoute) {
+        // Fetch user profile to get their role
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        const role = profile?.role || 'admin'
         const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
+
+        if (role === 'sales') {
+            url.pathname = '/sales/dashboard'
+        } else if (role === 'shipper') {
+            url.pathname = '/shipper/dashboard'
+        } else {
+            url.pathname = '/admin/dashboard'
+        }
+
         return NextResponse.redirect(url)
     }
 
-    // IMPORTANT: You *must* return the supabaseResponse object as it is.
-    // If you're creating a new response object with NextResponse.next() make sure to:
-    // 1. Pass the request in it, like so:
-    //    const myNewResponse = NextResponse.next({ request })
-    // 2. Copy over the cookies, like so:
-    //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-    // 3. Change the myNewResponse object to fit your needs, but avoid changing
-    //    the cookies!
-    // 4. Finally:
-    //    return myNewResponse
     return supabaseResponse
 }

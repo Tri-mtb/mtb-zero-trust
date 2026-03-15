@@ -10,7 +10,10 @@ app.use(cors());
 // Supposedly, Gateway handles the auth and passes the username/role in headers.
 // But to query the DB, we need a service role key safely stored here.
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Use service role key if available, otherwise fall back to anon key for demo
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY !== 'YOUR_SERVICE_ROLE_KEY_HERE') 
+  ? process.env.SUPABASE_SERVICE_ROLE_KEY 
+  : process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Middleware to extract Context passed by Gateway
@@ -82,6 +85,43 @@ app.get('/api/admin/export-customers', async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
 
     res.json({ message: 'Export successful', data: customers, count: customers.length });
+});
+
+// Endpoint 5: Update Order Status
+app.patch('/api/orders/:id', async (req, res) => {
+    const role = req.user.role;
+    
+    if (role === 'shipper') {
+        // Shipper can only update to 'delivered'
+        if (req.body.status !== 'delivered') {
+            return res.status(403).json({ error: 'Shippers can only mark orders as delivered' });
+        }
+    }
+
+    const { data, error } = await supabase
+        .from('orders')
+        .update({ status: req.body.status })
+        .eq('id', req.params.id)
+        .select();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
+// Endpoint 6: Access Logs (Admin only)
+app.get('/api/access-logs', async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only Admins can view access logs' });
+    }
+
+    const { data: logs, error } = await supabase
+        .from('access_logs')
+        .select('*')
+        .order('action_time', { ascending: false })
+        .limit(100);
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(logs);
 });
 
 const PORT = process.env.PORT || 4000;

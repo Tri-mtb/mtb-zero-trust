@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
@@ -7,12 +8,27 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 import uvicorn
 
-app = FastAPI()
+app = FastAPI(title="TrustGuard AI Risk Engine", description="Zero Trust Policy Decision Point (PDP)")
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "AI Risk Engine (PDP)", "model": "IsolationForest", "version": "2.4"}
+
 
 class ContextRequest(BaseModel):
     user_id: str
     role: str
     ip_address: str
+    geolocation: str
     device_fingerprint: str
     time: str
     endpoint: str
@@ -99,7 +115,13 @@ async def evaluate_risk(context: ContextRequest):
             reasons.append(f"High request frequency: {rate} req/min. Potential Data Exfiltration.")
             
         if is_known_ip == 0.0:
-            reasons.append(f"Unknown/Public IP address: {context.ip_address}")
+            loc = context.geolocation
+            reasons.append(f"Unknown/Public IP address: {context.ip_address} (Location: {loc})")
+            
+            # Projected Geo-blocking logic for non-local access
+            if loc != "Unknown" and "VN" not in loc:
+                decision = "block"
+                reasons.append(f"[GEO-BLOCK] Access from unauthorized region: {loc}")
             
         # AI RBAC / Level-based Access Control
         def get_role_level(r):

@@ -33,10 +33,16 @@ export async function login(formData: FormData) {
 
     revalidatePath('/', 'layout')
 
-    if (['admin', 'manager', 'staff'].includes(userRole)) {
-        redirect('/dashboard')
+    // Redirect based on role
+    if (userRole === 'admin') {
+        redirect('/admin/dashboard')
+    } else if (userRole === 'sales') {
+        redirect('/sales/dashboard')
+    } else if (userRole === 'shipper') {
+        redirect('/shipper/dashboard')
     } else {
-        redirect('/shop')
+        // Default for customer or unknown roles
+        redirect('/admin/dashboard')
     }
 }
 
@@ -67,10 +73,16 @@ export async function signup(formData: FormData) {
     }
 
     revalidatePath('/', 'layout')
-    if (['admin', 'manager', 'staff'].includes(role)) {
-        redirect('/dashboard')
+
+    // Redirect based on role after signup
+    if (role === 'admin') {
+        redirect('/admin/dashboard')
+    } else if (role === 'sales') {
+        redirect('/sales/dashboard')
+    } else if (role === 'shipper') {
+        redirect('/shipper/dashboard')
     } else {
-        redirect('/shop')
+        redirect('/admin/dashboard')
     }
 }
 
