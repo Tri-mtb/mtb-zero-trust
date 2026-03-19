@@ -34,12 +34,55 @@ const mockAccessLogs = [
 export default function SecurityLogsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [decisionFilter, setDecisionFilter] = useState("all");
-  const [selectedLog, setSelectedLog] = useState<typeof mockAccessLogs[0] | null>(null);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const filteredLogs = mockAccessLogs.filter(log => {
-    const matchSearch = log.user.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        log.endpoint.includes(searchTerm) ||
-                        log.ip.includes(searchTerm);
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) return;
+      
+      const res = await fetch("http://localhost:8080/api/access-logs", {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // format data matching mock structure locally
+        const formattedLogs = data.map((d: any) => ({
+           id: d.id,
+           timestamp: new Date(d.action_time).toLocaleString(),
+           user: d.user_id,
+           role: 'resolved in proxy',
+           ip: d.ip_address,
+           device: d.device_fingerprint,
+           endpoint: d.endpoint,
+           method: d.method,
+           riskScore: Math.round(d.risk_score || 0),
+           decision: d.decision,
+           reason: 'AI engine dynamic decision' 
+        }));
+        setLogs(formattedLogs);
+      }
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  const filteredLogs = logs.filter(log => {
+    const matchSearch = String(log.user).toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        String(log.endpoint).includes(searchTerm) ||
+                        String(log.ip).includes(searchTerm);
     const matchDecision = decisionFilter === "all" || log.decision === decisionFilter;
     return matchSearch && matchDecision;
   });
@@ -54,10 +97,10 @@ export default function SecurityLogsPage() {
   };
 
   const stats = {
-    total: mockAccessLogs.length,
-    allowed: mockAccessLogs.filter(l => l.decision === "allow").length,
-    blocked: mockAccessLogs.filter(l => l.decision === "block").length,
-    alerted: mockAccessLogs.filter(l => l.decision === "alert").length,
+    total: logs.length,
+    allowed: logs.filter(l => l.decision === "allow").length,
+    blocked: logs.filter(l => l.decision === "block").length,
+    alerted: logs.filter(l => l.decision === "alert").length,
   };
 
   return (
@@ -70,8 +113,8 @@ export default function SecurityLogsPage() {
           <p className="text-slate-400 text-sm mt-1">Zero Trust Gateway audit trail — every request is recorded</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-dark-panel border border-dark-border rounded-lg text-sm text-slate-300 hover:text-white transition-colors flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" /> Refresh
+          <button onClick={fetchLogs} className="px-4 py-2 bg-dark-panel border border-dark-border rounded-lg text-sm text-slate-300 hover:text-white transition-colors flex items-center gap-2">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
           <button className="px-4 py-2 bg-neon-blue text-dark-bg font-bold rounded-lg text-sm hover:bg-cyan-400 transition-colors flex items-center gap-2">
             <Download className="w-4 h-4" /> Export CSV

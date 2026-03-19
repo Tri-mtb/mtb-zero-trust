@@ -41,15 +41,49 @@ export default function UsersPage() {
   const [activeTab, setActiveTab] = useState<"system" | "customers">("system");
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [customers, setCustomers] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchCustomers() {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) return;
+        
+        const res = await fetch("http://localhost:8080/api/customers", {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        if (res.ok) {
+           const data = await res.json();
+           setCustomers(data.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              email: c.email,
+              phone: c.phone || 'N/A',
+              address: c.address || 'N/A',
+              totalOrders: c.total_orders || 0,
+              ltv: c.ltv || 0
+           })));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (activeTab === "customers") {
+       fetchCustomers();
+    }
+  }, [activeTab]);
 
   const filteredUsers = mockSystemUsers.filter(u => {
-    const matchSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchSearch = String(u.name).toLowerCase().includes(searchTerm.toLowerCase()) || String(u.email).toLowerCase().includes(searchTerm.toLowerCase());
     const matchRole = roleFilter === "all" || u.role === roleFilter;
     return matchSearch && matchRole;
   });
 
-  const filteredCustomers = mockCustomers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCustomers = customers.filter(c => 
+    String(c.name).toLowerCase().includes(searchTerm.toLowerCase()) || String(c.email).toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getRoleBadge = (role: string) => {
@@ -86,7 +120,7 @@ export default function UsersPage() {
           onClick={() => { setActiveTab("customers"); setSearchTerm(""); }}
           className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${activeTab === "customers" ? "bg-neon-blue/10 text-neon-blue border border-neon-blue/30" : "text-slate-400 hover:text-white"}`}
         >
-          <Users className="w-4 h-4" /> Customers ({mockCustomers.length})
+          <Users className="w-4 h-4" /> Customers ({customers.length})
         </button>
       </div>
 
@@ -212,7 +246,7 @@ export default function UsersPage() {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center font-bold text-white text-sm">
-                    {customer.name.split(' ').map(n => n[0]).join('')}
+                    {customer.name ? customer.name.split(' ').map((n: string) => n[0]).join('') : '?'}
                   </div>
                   <div>
                     <h3 className="text-white font-bold">{customer.name}</h3>

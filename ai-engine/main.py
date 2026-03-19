@@ -103,12 +103,14 @@ async def evaluate_risk(context: ContextRequest):
         
         # Model-based decision
         if prediction == -1:
-            decision = "block"
             reasons.append(f"AI Model detected unusual behavior (Score: {anomaly_score:.2f})")
+            # Only block if it's significantly anomalous, or high rate. Small hour anomaly is just a warning.
+            if anomaly_score > 0.7 or rate > 10:
+                decision = "block"
             
         # Explanations for the behavior
         if hour < 6 or hour > 20: 
-            reasons.append(f"Accessed at unusual hour ({hour}:00)")
+            reasons.append(f"Accessed at unusual hour ({hour}:00 UTC)")
             
         if rate > 20: # High request rate -> Data Exfiltration simulation
             decision = "block"

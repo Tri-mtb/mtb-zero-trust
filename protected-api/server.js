@@ -43,20 +43,89 @@ app.get('/api/products', async (req, res) => {
     res.json(products);
 });
 
+// Add Product
+app.post('/api/products', async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only Admins can add products' });
+    }
+    const { name, description, price, stock } = req.body;
+    const { data, error } = await supabase.from('products').insert([{ name, description, price, stock }]).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
+// Edit Product
+app.patch('/api/products/:id', async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only Admins can edit products' });
+    }
+    const { name, description, price, stock } = req.body;
+    
+    // Only update fields that are provided
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (price !== undefined) updateData.price = price;
+    if (stock !== undefined) updateData.stock = stock;
+    
+    const { data, error } = await supabase.from('products').update(updateData).eq('id', req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
 // Endpoint 2: Orders
 app.get('/api/orders', async (req, res) => {
     // Role matching
     const role = req.user.role;
-    let query = supabase.from('orders').select('*, order_items(*, products(*))');
+    let query = supabase.from('orders').select('*, order_items(*, products(*))').order('created_at', { ascending: false });
 
     if (role === 'shipper') {
         // Shipper only sees id, status, shipping_address
-        query = supabase.from('orders').select('id, status, shipping_address');
+        query = supabase.from('orders').select('id, status, shipping_address', { count: 'exact' }).order('created_at', { ascending: false });
     }
 
     const { data: orders, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
     res.json(orders);
+});
+
+// Create Order (Checkout)
+app.post('/api/orders', async (req, res) => {
+    const { items, total_amount, address } = req.body;
+    const userId = req.user.id;
+    
+    // Auto creating customer profile if they don't exist yet out of convenience
+    const { data: custInfo } = await supabase.from('customers').select('*').eq('id', userId).single();
+    if (!custInfo) {
+        await supabase.from('customers').insert({
+             id: userId,
+             name: 'Unknown User ' + userId.substring(0,6),
+             email: 'unknown@trustguard.local',
+             address: address || 'N/A'
+        });
+    }
+
+    const { data: order, error: orderErr } = await supabase
+        .from('orders')
+        .insert({ customer_id: userId, total_amount, status: 'pending', shipping_address: address || 'N/A' })
+        .select('id')
+        .single();
+        
+    if (orderErr) return res.status(500).json({ error: orderErr.message });
+    
+    const orderItems = items.map(item => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price: item.price
+    }));
+    
+    const { error: itemsErr } = await supabase.from('order_items').insert(orderItems);
+    if (itemsErr) {
+        return res.status(500).json({ error: itemsErr.message });
+    }
+    
+    res.json({ message: 'Order created successfully', order_id: order.id });
 });
 
 // Endpoint 3: Customers (Staff & Admin only)

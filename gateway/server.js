@@ -32,8 +32,11 @@ app.use(async (req, res, next) => {
     try {
         // Decode JWT payload to check MFA status (aal2)
         const tokenPayload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
-        if (tokenPayload.aal !== 'aal2') {
-            return res.status(403).json({ error: 'MFA (2FA) Verification Required. Access Denied.' });
+        
+        // Zero Trust rule: Block access if the user hasn't successfully passed MFA (AAL2).
+        // DEMO OVERRIDE: Allowed bypass via ENV variable for easier local development/demo.
+        if (tokenPayload.aal !== 'aal2' && process.env.ENFORCE_STRICT_MFA === 'true') {
+            return res.status(403).json({ error: 'MFA (2FA) Verification Required. Access Denied. Your session is at Assurance Level 1.' });
         }
     } catch (e) {
         return res.status(400).json({ error: 'Invalid token format.' });
@@ -46,14 +49,23 @@ app.use(async (req, res, next) => {
         return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    // Fetch user profile to get Role
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-
-    if (!profile) {
-        return res.status(403).json({ error: 'User profile not found or role unassigned' });
+    // Retrieve Role from JWT metadata (set during signup) or via authenticated DB query
+    let role = user.user_metadata?.role;
+    
+    if (!role) {
+        // Fallback: Query DB with the user's explicit token to respect RLS
+        const userClient = createClient(supabaseUrl, supabaseKey, {
+            global: { headers: { Authorization: `Bearer ${token}` } }
+        });
+        const { data: profile } = await userClient.from('profiles').select('role').eq('id', user.id).single();
+        role = profile?.role;
     }
 
-    const role = profile.role;
+    // Strict Zero Trust: If no explicit role is found, default to least-privilege role
+    if (!role) {
+        console.warn(`User ${user.id} has no explicit role. Defaulting to 'customer' (Zero Trust Principle).`);
+        role = 'customer';
+    }
 
     // 2. Collect Context
     const ua = parser(req.headers['user-agent']);
@@ -115,7 +127,7 @@ app.use(async (req, res, next) => {
 });
 
 // Proxy routes to Protected API
-app.all('/{*path}', async (req, res) => {
+app.use(async (req, res) => {
     try {
         const url = `${PROTECTED_API_URL}${req.originalUrl}`;
         const targetReq = {

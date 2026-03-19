@@ -42,7 +42,7 @@ export async function login(formData: FormData) {
         redirect('/shipper/dashboard')
     } else {
         // Default for customer or unknown roles
-        redirect('/admin/dashboard')
+        redirect('/store')
     }
 }
 
@@ -82,7 +82,7 @@ export async function signup(formData: FormData) {
     } else if (role === 'shipper') {
         redirect('/shipper/dashboard')
     } else {
-        redirect('/admin/dashboard')
+        redirect('/store')
     }
 }
 

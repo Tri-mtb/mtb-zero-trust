@@ -40,6 +40,7 @@ export default function DashboardLayout({
   if (role === "admin") {
     actMenuItems = [
       { href: "/admin/dashboard", label: "Security Overview", icon: Activity },
+      { href: "/admin/mfa", label: "MFA Verification", icon: ShieldAlert },
       { href: "/admin/ecommerce", label: "E-Commerce Ops", icon: ShoppingCart },
       { href: "/admin/users", label: "Users & Customers", icon: Users },
       { href: "/admin/threat-detection", label: "AI Threat Detection", icon: Cpu, badge: "AI" },
