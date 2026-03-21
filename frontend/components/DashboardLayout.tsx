@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -22,6 +22,7 @@ import {
   Package
 } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { createClient } from "@/lib/supabase/client";
 
 export default function DashboardLayout({ 
   children, 
@@ -33,6 +34,19 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [showAlertModal, setShowAlertModal] = useState(false);
+  const [userName, setUserName] = useState<string>("");
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const name = user.user_metadata?.full_name || user.email?.split('@')[0] || role;
+        setUserName(name);
+      }
+    };
+    fetchUser();
+  }, [role]);
 
   // Menu items per role
   let actMenuItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [];
@@ -175,8 +189,11 @@ export default function DashboardLayout({
             )}
 
             {/* User Profile */}
-            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-slate-400 cursor-pointer hover:border-neon-blue transition-colors">
-              {role.charAt(0).toUpperCase()}
+            <div className="flex items-center gap-2 cursor-pointer" title={userName}>
+              <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-slate-400 hover:border-neon-blue transition-colors">
+                {userName ? userName.charAt(0).toUpperCase() : role.charAt(0).toUpperCase()}
+              </div>
+              <span className="hidden lg:block text-sm text-slate-400 font-medium max-w-[120px] truncate">{userName}</span>
             </div>
           </div>
         </header>

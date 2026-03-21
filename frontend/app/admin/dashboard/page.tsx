@@ -52,7 +52,8 @@ export default function SecurityDashboard() {
         
         if (!session) return;
         
-        const res = await fetch("http://localhost:8080/api/access-logs", {
+        const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+        const res = await fetch(`${gatewayUrl}/api/access-logs`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         });
         if (res.ok) {

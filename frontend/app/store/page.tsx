@@ -20,13 +20,16 @@ interface CartItem {
   quantity: number;
 }
 
+// Ảnh fallback khi URL nào đó bị hỏng
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80";
+
 // Map real images to our security products
 const productImages: Record<string, string> = {
   "Zero Trust Firewall X1": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80",
   "AI Threat Detector Pro": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80",
   "Enterprise Gateway Router": "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&q=80",
   "Quantum Encryption Module": "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&q=80",
-  "Biometric Auth Token": "https://images.unsplash.com/photo-1614064641913-6b20a7efae4e?w=800&q=80",
+  "Biometric Auth Token": "https://images.unsplash.com/photo-1585079542156-2755d9c8a094?w=800&q=80",
   "DDoS Mitigation Appliance": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80",
   "Secure Enclave Server": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80",
   "Zero-Knowledge VPN Gateway": "https://images.unsplash.com/photo-1606131731446-5568d87113aa?w=800&q=80"
@@ -119,7 +122,8 @@ export default function StoreFront() {
         }))
       };
 
-      const res = await fetch("http://localhost:8080/api/orders", {
+      const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+      const res = await fetch(`${gatewayUrl}/api/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -237,7 +241,7 @@ export default function StoreFront() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8">
             {products.map((product) => {
-              const imageUrl = productImages[product.name] || "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80";
+              const imageUrl = productImages[product.name] || FALLBACK_IMAGE;
               
               return (
                 <div key={product.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-neon-blue/40 transition-all hover:shadow-[0_8px_30px_rgba(0,240,255,0.15)] group flex flex-col">
@@ -247,6 +251,7 @@ export default function StoreFront() {
                        src={imageUrl} 
                        alt={product.name}
                        className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700 ease-out opacity-80 group-hover:opacity-100"
+                       onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                      />
                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80"></div>
                      {/* Stock badge */}
@@ -326,11 +331,11 @@ export default function StoreFront() {
               ) : (
                 <div className="space-y-6">
                   {cartItems.map((item) => {
-                    const imageUrl = productImages[item.product.name] || "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80";
+                    const imageUrl = productImages[item.product.name] || FALLBACK_IMAGE;
                     
                     return (
                       <div key={item.product.id} className="flex gap-4 items-center bg-slate-950/50 p-3 rounded-xl border border-slate-800">
-                        <img src={imageUrl} alt={item.product.name} className="w-20 h-20 object-cover rounded-md" />
+                        <img src={imageUrl} alt={item.product.name} className="w-20 h-20 object-cover rounded-md" onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-white font-bold truncate">{item.product.name}</h4>
                           <p className="text-neon-blue font-bold mb-2">${item.product.price.toLocaleString()}</p>

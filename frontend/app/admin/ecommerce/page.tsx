@@ -15,6 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 
 export default function EcommerceAdmin() {
+  const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -40,9 +41,9 @@ export default function EcommerceAdmin() {
     
     try {
       const [prodRes, ordRes, custRes] = await Promise.all([
-        fetch("http://localhost:8080/api/products", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("http://localhost:8080/api/orders", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("http://localhost:8080/api/customers", { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${gatewayUrl}/api/products`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${gatewayUrl}/api/orders`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${gatewayUrl}/api/customers`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       
       if (!prodRes.ok) {
@@ -67,7 +68,7 @@ export default function EcommerceAdmin() {
       const token = await fetchAuthToken();
       if (!token) return;
 
-      const res = await fetch("http://localhost:8080/api/admin/export-customers", {
+      const res = await fetch(`${gatewayUrl}/api/admin/export-customers`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -110,8 +111,8 @@ export default function EcommerceAdmin() {
       if (!token) return;
 
       const url = editingProduct 
-        ? `http://localhost:8080/api/products/${editingProduct.id}`
-        : `http://localhost:8080/api/products`;
+        ? `${gatewayUrl}/api/products/${editingProduct.id}`
+        : `${gatewayUrl}/api/products`;
       
       const method = editingProduct ? "PATCH" : "POST";
 

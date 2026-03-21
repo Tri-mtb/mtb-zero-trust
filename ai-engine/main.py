@@ -10,10 +10,12 @@ import uvicorn
 
 app = FastAPI(title="TrustGuard AI Risk Engine", description="Zero Trust Policy Decision Point (PDP)")
 
-# CORS Configuration
+# CORS Configuration - Zero Trust: Only allow known origins
+import os
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

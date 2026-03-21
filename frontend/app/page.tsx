@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Shield, Lock, Cpu, Eye, ArrowRight, Activity, Globe } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { Shield, Lock, Cpu, Eye, ArrowRight, Activity, Globe, Menu, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
 
 // MTB Logo Component
 const MtbLogo = () => (
   <div className="relative flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg shadow-blue-500/30 overflow-hidden transform hover:scale-105 transition-transform flex-shrink-0">
-    <div className="absolute inset-0 bg-[url('/hex-pattern.svg')] opacity-20 mix-blend-overlay"></div>
+    <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2228%22%20height%3D%2249%22%20viewBox%3D%220%200%2028%2049%22%3E%3Cg%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.4%22%3E%3Cpath%20d%3D%22M13.99%209.25l13%207.5v15l-13%207.5L1%2031.75v-15l12.99-7.5zM3%2017.9v12.7l10.99%206.34%2011-6.35V17.9l-11-6.34L3%2017.9zM0%2015l12.98-7.5V0h-2v6.35L0%2012.69v2.3zm0%2018.5L12.98%2041v8h-2v-6.85L0%2035.81v-2.3zM15%200v7.5L27.99%2015H28v-2.31h-.01L17%206.35V0h-2zm0%2049v-8l12.99-7.5H28v2.31h-.01L17%2042.15V49h-2z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20 mix-blend-overlay"></div>
     <div className="absolute top-0 right-0 w-8 h-8 bg-white/10 rounded-full blur-sm translate-x-2 -translate-y-2"></div>
     <span className="relative z-10 text-white font-black text-xl tracking-tighter" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
       MTB
@@ -23,7 +23,7 @@ const MtbLogo = () => (
 // Variants for animations
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } }
 }
 
 const staggerContainer = {
@@ -36,6 +36,7 @@ const staggerContainer = {
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,7 +57,7 @@ export default function LandingPage() {
     <div className="min-h-screen flex flex-col items-center relative overflow-hidden font-sans text-slate-800 bg-slate-50">
       {/* Background aesthetics */}
       <div className="fixed inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] z-0 opacity-40 pointer-events-none" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-blue-200/40 blur-[120px] rounded-full point-events-none z-0"></div>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-blue-200/40 blur-[120px] rounded-full pointer-events-none z-0"></div>
 
       <header className={`w-full py-4 px-6 fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -76,8 +77,59 @@ export default function LandingPage() {
               Dùng thử ngay
             </Link>
           </div>
+          {/* Mobile Menu Button */}
+          <button
+            className="sm:hidden p-2 rounded-xl border border-slate-200 bg-white/80 backdrop-blur-sm text-slate-700 hover:bg-blue-50 hover:border-blue-300 transition-all"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle mobile menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </header>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="fixed top-[72px] left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-b border-slate-200 shadow-xl sm:hidden"
+          >
+            <nav className="flex flex-col gap-1 p-4">
+              <button
+                onClick={() => { scrollToSection('features'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+              >
+                Tính năng
+              </button>
+              <button
+                onClick={() => { scrollToSection('about'); setMobileMenuOpen(false); }}
+                className="w-full text-left px-4 py-3 rounded-xl text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+              >
+                Giới thiệu
+              </button>
+              <div className="border-t border-slate-100 my-2"></div>
+              <Link
+                href="/login"
+                className="w-full text-center px-4 py-3 rounded-xl text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-all"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                href="/login"
+                className="w-full text-center px-4 py-3 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Dùng thử ngay
+              </Link>
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="relative z-10 w-full flex flex-col items-center mt-20">
         
@@ -127,16 +179,17 @@ export default function LandingPage() {
             initial={{ opacity: 0, scale: 0.9, rotateY: -10 }} 
             animate={{ opacity: 1, scale: 1, rotateY: 0 }} 
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-            className="relative lg:h-[500px] flex justify-center items-center perspective-1000"
+            className="relative lg:h-[500px] flex justify-center items-center"
+            style={{ perspective: '1000px' }}
           >
             <div className="absolute inset-0 bg-blue-200/30 blur-3xl rounded-full"></div>
             <div className="relative w-full max-w-lg aspect-square lg:aspect-auto lg:h-[450px] shadow-2xl rounded-3xl overflow-hidden border border-white/40 bg-white/50 backdrop-blur-sm transform transition-transform duration-500 hover:scale-[1.02] hover:shadow-blue-500/20">
                <Image 
                  src="/images/hero-zero-trust.png" 
                  alt="AI Zero Trust Representation" 
-                 layout="fill" 
-                 objectFit="cover" 
-                 className="mix-blend-multiply opacity-90"
+                 fill
+                 sizes="(max-width: 768px) 100vw, 50vw"
+                 className="object-cover mix-blend-multiply opacity-90"
                  priority
                />
                <div className="absolute inset-0 border border-white/50 rounded-3xl pointer-events-none"></div>
@@ -147,6 +200,7 @@ export default function LandingPage() {
               animate={{ y: [0, -10, 0] }} 
               transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
               className="absolute -left-6 bottom-10 bg-white p-4 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-4"
+              aria-label="Trạng thái bảo vệ mạng"
             >
               <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
                 <Shield className="w-5 h-5 text-emerald-600"/>
@@ -171,9 +225,9 @@ export default function LandingPage() {
                <Image 
                  src="/images/features-dashboard.png" 
                  alt="Data Dashboard UI" 
-                 layout="fill" 
-                 objectFit="cover" 
-                 className="transform transition-transform duration-700 group-hover:scale-105"
+                 fill
+                 sizes="(max-width: 768px) 100vw, 50vw"
+                 className="object-cover transform transition-transform duration-700 group-hover:scale-105"
                />
                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end p-8">
                  <div className="bg-white/90 backdrop-blur-md p-4 rounded-xl border border-white/50 shadow-lg">
