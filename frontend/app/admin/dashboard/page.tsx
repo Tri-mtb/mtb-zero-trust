@@ -39,8 +39,21 @@ const suspiciousAlerts = [
   { id: 3, user: 'buyer_77', location: 'China', score: 78, status: 'Investigating', time: '1 hour ago' },
 ];
 
+// TypeScript interfaces for API data
+interface AccessLog {
+  id: string;
+  user_id: string;
+  ip_address: string;
+  device_fingerprint: string;
+  endpoint: string;
+  method: string;
+  action_time: string;
+  risk_score: number;
+  decision: 'allow' | 'alert' | 'block';
+}
+
 export default function SecurityDashboard() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AccessLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
@@ -57,7 +70,7 @@ export default function SecurityDashboard() {
           headers: { Authorization: `Bearer ${session.access_token}` }
         });
         if (res.ok) {
-           const data = await res.json();
+           const data: AccessLog[] = await res.json();
            setLogs(data);
         }
       } catch(e) {
@@ -70,10 +83,10 @@ export default function SecurityDashboard() {
   }, []);
 
   const totalSessions = 1204; // Mock scale
-  const actualBlocked = logs.filter((l: any) => l.decision === 'block').length;
-  const recentAlerts = logs.filter((l: any) => l.decision === 'alert' || l.decision === 'block').slice(0, 5);
+  const actualBlocked = logs.filter((l) => l.decision === 'block').length;
+  const recentAlerts = logs.filter((l) => l.decision === 'alert' || l.decision === 'block').slice(0, 5);
   const avgTrustScore = logs.length > 0 
-    ? (100 - (logs.reduce((acc: any, curr: any) => acc + (curr.risk_score || 0), 0) / logs.length)).toFixed(1) 
+    ? (100 - (logs.reduce((acc, curr) => acc + (curr.risk_score || 0), 0) / logs.length)).toFixed(1) 
     : "94.2";
 
   return (
@@ -154,7 +167,7 @@ export default function SecurityDashboard() {
             </h3>
           </div>
           <div className="flex-1 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
-            {recentAlerts.length > 0 ? recentAlerts.map((alert: any) => (
+            {recentAlerts.length > 0 ? recentAlerts.map((alert) => (
               <div key={alert.id} className="p-3 bg-dark-bg border border-dark-border rounded-lg relative overflow-hidden group hover:border-neon-red/50 transition-colors">
                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${alert.decision === 'block' ? 'bg-neon-red' : 'bg-neon-yellow'}`}></div>
                 <div className="flex justify-between items-start mb-1">
@@ -197,7 +210,7 @@ export default function SecurityDashboard() {
                </tr>
              </thead>
              <tbody className="divide-y divide-dark-border">
-               {logs.slice(0, 50).map((log: any, i: number) => (
+               {logs.slice(0, 50).map((log, i) => (
                <tr key={i} className={`hover:bg-dark-bg transition-colors ${log.decision === 'block' ? 'bg-red-500/[0.02]' : ''}`}>
                  <td className="px-4 py-3 font-mono text-[11px] whitespace-nowrap">{new Date(log.action_time).toLocaleString()}</td>
                  <td className="px-4 py-3 text-white truncate max-w-[150px]" title={log.user_id}>{log.user_id}</td>

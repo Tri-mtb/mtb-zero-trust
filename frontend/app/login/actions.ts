@@ -51,7 +51,12 @@ export async function signup(formData: FormData) {
 
     const email = formData.get('email') as string
     const password = formData.get('password') as string
-    const role = formData.get('role') as string || 'customer'
+    const requestedRole = formData.get('role') as string || 'customer'
+
+    // SECURITY: Server-side validation — prevent role injection
+    // Only non-privileged roles are allowed via self-registration
+    const ALLOWED_SIGNUP_ROLES = ['customer', 'sales', 'shipper']
+    const role = ALLOWED_SIGNUP_ROLES.includes(requestedRole) ? requestedRole : 'customer'
 
     if (!email || !password) {
         return { error: 'Email and password are required' }

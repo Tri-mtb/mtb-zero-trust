@@ -22,11 +22,11 @@ import {
 } from "lucide-react";
 
 const mockSystemUsers = [
-  { id: "USR-001", name: "Nguyễn Admin", email: "admin@trustguard.ai", role: "admin", status: "active", lastLogin: "2 phút trước", clearance: 3, riskScore: 5 },
-  { id: "USR-002", name: "Trần Sales", email: "sales@trustguard.ai", role: "sales", status: "active", lastLogin: "15 phút trước", clearance: 2, riskScore: 12 },
-  { id: "USR-003", name: "Lê Shipper", email: "shipper@trustguard.ai", role: "shipper", status: "active", lastLogin: "1 giờ trước", clearance: 1, riskScore: 8 },
-  { id: "USR-004", name: "Phạm Staff", email: "staff2@trustguard.ai", role: "sales", status: "suspended", lastLogin: "3 ngày trước", clearance: 2, riskScore: 92 },
-  { id: "USR-005", name: "Hồ Admin", email: "admin2@trustguard.ai", role: "admin", status: "active", lastLogin: "30 phút trước", clearance: 3, riskScore: 3 },
+  { id: "USR-001", name: "Nguyen Admin", email: "admin@trustguard.ai", role: "admin", status: "active", lastLogin: "2 mins ago", clearance: 3, riskScore: 5 },
+  { id: "USR-002", name: "Tran Sales", email: "sales@trustguard.ai", role: "sales", status: "active", lastLogin: "15 mins ago", clearance: 2, riskScore: 12 },
+  { id: "USR-003", name: "Le Shipper", email: "shipper@trustguard.ai", role: "shipper", status: "active", lastLogin: "1 hour ago", clearance: 1, riskScore: 8 },
+  { id: "USR-004", name: "Pham Staff", email: "staff2@trustguard.ai", role: "sales", status: "suspended", lastLogin: "3 days ago", clearance: 2, riskScore: 92 },
+  { id: "USR-005", name: "Ho Admin", email: "admin2@trustguard.ai", role: "admin", status: "active", lastLogin: "30 mins ago", clearance: 3, riskScore: 3 },
 ];
 
 const mockCustomers = [

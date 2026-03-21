@@ -247,11 +247,12 @@ export default function StoreFront() {
                 <div key={product.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-neon-blue/40 transition-all hover:shadow-[0_8px_30px_rgba(0,240,255,0.15)] group flex flex-col">
                   {/* Product Image */}
                   <div className="aspect-[4/3] bg-slate-800 relative flex items-center justify-center overflow-hidden">
-                     <img 
+                     <Image 
                        src={imageUrl} 
                        alt={product.name}
-                       className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-700 ease-out opacity-80 group-hover:opacity-100"
-                       onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
+                       fill
+                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                       className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-80 group-hover:opacity-100"
                      />
                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80"></div>
                      {/* Stock badge */}
@@ -335,7 +336,7 @@ export default function StoreFront() {
                     
                     return (
                       <div key={item.product.id} className="flex gap-4 items-center bg-slate-950/50 p-3 rounded-xl border border-slate-800">
-                        <img src={imageUrl} alt={item.product.name} className="w-20 h-20 object-cover rounded-md" onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
+                        <Image src={imageUrl} alt={item.product.name} width={80} height={80} className="w-20 h-20 object-cover rounded-md" />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-white font-bold truncate">{item.product.name}</h4>
                           <p className="text-neon-blue font-bold mb-2">${item.product.price.toLocaleString()}</p>

@@ -131,7 +131,6 @@ export default function LoginForm() {
                             <option value="customer">Role: Customer</option>
                             <option value="sales">Role: Sales representative</option>
                             <option value="shipper">Role: Logistics (Shipper)</option>
-                            <option value="admin">Role: Administrator</option>
                         </select>
                     </div>
                 )}

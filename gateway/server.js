@@ -8,7 +8,31 @@ const geoip = require('geoip-lite');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// SECURITY: Rate limiting — protect against brute-force and API abuse
+const rateLimit = require('express-rate-limit');
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests from this IP. Rate limited by Zero Trust Gateway.' }
+});
+app.use(globalLimiter);
+
+// SECURITY: Restrict CORS to known origins only (Zero Trust principle)
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like server-to-server calls)
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('CORS policy: Origin not allowed'), false);
+    },
+    credentials: true
+}));
 
 // Supabase Setup
 const supabaseUrl = process.env.SUPABASE_URL;
