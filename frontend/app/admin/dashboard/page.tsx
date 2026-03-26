@@ -55,6 +55,7 @@ interface AccessLog {
 export default function SecurityDashboard() {
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   React.useEffect(() => {
     async function fetchData() {
@@ -72,9 +73,12 @@ export default function SecurityDashboard() {
         if (res.ok) {
            const data: AccessLog[] = await res.json();
            setLogs(data);
+        } else {
+           setError(`API Error: ${res.status}`);
         }
       } catch(e) {
-        console.error(e);
+        console.warn("Could not reach gateway:", e);
+        setError("Could not reach Zero Trust Gateway. Is the backend running?");
       } finally {
         setLoading(false);
       }
@@ -198,6 +202,11 @@ export default function SecurityDashboard() {
             </h3>
             <p className="text-sm text-slate-400">Live feed from the Zero Trust Gateway Enforcement Point</p>
          </div>
+         {error && (
+           <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm mb-4">
+             {error}
+           </div>
+         )}
          <div className="overflow-x-auto max-h-[300px] custom-scrollbar">
            <table className="w-full text-left text-sm text-slate-400 relative">
              <thead className="text-xs uppercase bg-dark-panel text-slate-500 border-b border-dark-border sticky top-0 z-10">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ShoppingCart,
   Search,
@@ -15,25 +15,91 @@ import {
   ChevronRight
 } from "lucide-react";
 
-const mockOrders = [
-  { id: "ORD-801", customer: "Alice D.", items: 3, total: 450.00, status: "processing", date: "2026-03-12", address: "123 Tech Ave, HCMC" },
-  { id: "ORD-802", customer: "Bob S.", items: 1, total: 199.00, status: "pending", date: "2026-03-12", address: "45 Cyber St, Hanoi" },
-  { id: "ORD-803", customer: "Charlie P.", items: 5, total: 1250.00, status: "shipped", date: "2026-03-11", address: "89 Cloud Rd, Da Nang" },
-  { id: "ORD-804", customer: "Diana N.", items: 2, total: 380.00, status: "delivered", date: "2026-03-10", address: "67 ZT Blvd, HCMC" },
-  { id: "ORD-805", customer: "Ethan T.", items: 4, total: 720.00, status: "processing", date: "2026-03-12", address: "12 Secure Lane, Hanoi" },
-  { id: "ORD-806", customer: "Fiona L.", items: 1, total: 89.00, status: "cancelled", date: "2026-03-09", address: "34 Gateway Ave, HCMC" },
-  { id: "ORD-807", customer: "George H.", items: 2, total: 540.00, status: "pending", date: "2026-03-12", address: "56 Shield Rd, Da Nang" },
-  { id: "ORD-808", customer: "Hannah K.", items: 3, total: 890.00, status: "shipped", date: "2026-03-11", address: "78 Trust St, Hanoi" },
-];
+import { createClient } from "@/lib/supabase/client";
 
 export default function SalesOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedOrder, setSelectedOrder] = useState<typeof mockOrders[0] | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [customersMap, setCustomersMap] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
-  const filteredOrders = mockOrders.filter(order => {
+  const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setErrorMsg("No active session");
+          setLoading(false);
+          return;
+        }
+
+        const [ordRes, custRes] = await Promise.all([
+           fetch(`${gatewayUrl}/api/orders`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
+           fetch(`${gatewayUrl}/api/customers`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+        ]);
+
+        if (!ordRes.ok) {
+           const errData = await ordRes.json().catch(() => ({}));
+           throw new Error(errData.error || `Gateway Error ${ordRes.status}`);
+        }
+
+        const ordData = await ordRes.json();
+        setOrders(ordData);
+
+        if (custRes.ok) {
+           const custData = await custRes.json();
+           const cMap: Record<string, string> = {};
+           custData.forEach((c: any) => { cMap[c.id] = c.name });
+           setCustomersMap(cMap);
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [gatewayUrl]);
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`${gatewayUrl}/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update status");
+      }
+
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: newStatus });
+      }
+    } catch (e: any) {
+      alert("Error updating order: " + e.message);
+    }
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const customerName = customersMap[order.customer_id] || order.customer_id || "";
     const matchSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        order.customer.toLowerCase().includes(searchTerm.toLowerCase());
+                        customerName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = statusFilter === "all" || order.status === statusFilter;
     return matchSearch && matchStatus;
   });
@@ -50,11 +116,11 @@ export default function SalesOrdersPage() {
   };
 
   const stats = {
-    total: mockOrders.length,
-    pending: mockOrders.filter(o => o.status === "pending").length,
-    processing: mockOrders.filter(o => o.status === "processing").length,
-    shipped: mockOrders.filter(o => o.status === "shipped").length,
-    revenue: mockOrders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + o.total, 0),
+    total: orders.length,
+    pending: orders.filter(o => o.status === "pending").length,
+    processing: orders.filter(o => o.status === "processing").length,
+    shipped: orders.filter(o => o.status === "shipped").length,
+    revenue: orders.filter(o => o.status !== "cancelled").reduce((sum, o) => sum + (o.total_amount || 0), 0),
   };
 
   return (
@@ -124,47 +190,68 @@ export default function SalesOrdersPage() {
         </select>
       </div>
 
-      {/* Orders List */}
-      <div className="space-y-3">
-        {filteredOrders.map(order => {
-          const statusStyle = getStatusStyle(order.status);
-          const StatusIcon = statusStyle.icon;
-          return (
-            <div
-              key={order.id}
-              onClick={() => setSelectedOrder(order)}
-              className="bg-dark-panel border border-dark-border rounded-xl p-5 hover:border-neon-purple/30 transition-colors cursor-pointer group"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${statusStyle.bg} border ${statusStyle.border}`}>
-                    <StatusIcon className={`w-5 h-5 ${statusStyle.color}`} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-white font-bold font-mono">{order.id}</h3>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold capitalize border ${statusStyle.bg} ${statusStyle.color} ${statusStyle.border}`}>
-                        {order.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Customer: <span className="text-slate-300">{order.customer}</span> • {order.items} items
-                    </p>
-                  </div>
-                </div>
+      {/* Error Message */}
+      {errorMsg && (
+        <div className="bg-neon-red/10 border border-neon-red/30 text-neon-red p-3 rounded-lg flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Error: {errorMsg}</span>
+        </div>
+      )}
 
-                <div className="flex items-center gap-6 sm:text-right">
-                  <div>
-                    <p className="text-lg font-bold text-white">${order.total.toFixed(2)}</p>
-                    <p className="text-xs text-slate-500">{order.date}</p>
+      {/* Orders List */}
+      {loading ? (
+        <div className="flex justify-center p-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-blue"></div>
+        </div>
+      ) : (
+        <div className="space-y-3 mt-6">
+          {filteredOrders.length > 0 ? filteredOrders.map(order => {
+            const statusStyle = getStatusStyle(order.status);
+            const StatusIcon = statusStyle.icon;
+            const customerName = customersMap[order.customer_id] || order.customer_id;
+            const itemsCount = order.order_items?.length || 0;
+            
+            return (
+              <div
+                key={order.id}
+                onClick={() => setSelectedOrder(order)}
+                className="bg-dark-panel border border-dark-border rounded-xl p-5 hover:border-neon-purple/30 transition-colors cursor-pointer group"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${statusStyle.bg} border ${statusStyle.border} flex-shrink-0`}>
+                      <StatusIcon className={`w-5 h-5 ${statusStyle.color}`} />
+                    </div>
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-white font-bold font-mono truncate max-w-[120px]" title={order.id}>{order.id}</h3>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold capitalize border ${statusStyle.bg} ${statusStyle.color} ${statusStyle.border} flex-shrink-0`}>
+                          {order.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[200px]" title={customerName}>
+                        Customer: <span className="text-slate-300">{customerName}</span> • {itemsCount} items
+                      </p>
+                    </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-neon-purple transition-colors" />
+
+                  <div className="flex items-center gap-6 sm:text-right flex-shrink-0">
+                    <div>
+                      <p className="text-lg font-bold text-white">${(order.total_amount || 0).toLocaleString()}</p>
+                      <p className="text-xs text-slate-500">{new Date(order.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-neon-purple transition-colors" />
+                  </div>
                 </div>
               </div>
+            );
+          }) : (
+            <div className="text-center py-12 text-slate-500 border border-dashed border-dark-border rounded-xl">
+              No orders found.
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Order Detail Modal */}
       {selectedOrder && (
@@ -178,20 +265,20 @@ export default function SalesOrdersPage() {
             <div className="space-y-3">
               <div className="bg-dark-bg p-3 rounded-lg border border-dark-border">
                 <p className="text-xs text-slate-500 mb-1">Customer</p>
-                <p className="text-sm text-white font-medium">{selectedOrder.customer}</p>
+                <p className="text-sm text-white font-medium">{customersMap[selectedOrder.customer_id] || selectedOrder.customer_id}</p>
               </div>
               <div className="bg-dark-bg p-3 rounded-lg border border-dark-border">
                 <p className="text-xs text-slate-500 mb-1">Shipping Address</p>
-                <p className="text-sm text-white">{selectedOrder.address}</p>
+                <p className="text-sm text-white">{selectedOrder.shipping_address}</p>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-dark-bg p-3 rounded-lg border border-dark-border text-center">
                   <p className="text-xs text-slate-500">Items</p>
-                  <p className="text-lg font-bold text-white">{selectedOrder.items}</p>
+                  <p className="text-lg font-bold text-white">{selectedOrder.order_items?.length || 0}</p>
                 </div>
                 <div className="bg-dark-bg p-3 rounded-lg border border-dark-border text-center">
                   <p className="text-xs text-slate-500">Total</p>
-                  <p className="text-lg font-bold text-neon-green">${selectedOrder.total.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-neon-green">${(selectedOrder.total_amount || 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-dark-bg p-3 rounded-lg border border-dark-border text-center">
                   <p className="text-xs text-slate-500">Status</p>
@@ -202,12 +289,12 @@ export default function SalesOrdersPage() {
 
             <div className="flex gap-3 mt-6">
               {selectedOrder.status === "pending" && (
-                <button className="flex-1 py-2.5 text-sm font-semibold bg-neon-blue text-dark-bg rounded-lg hover:bg-cyan-400 transition-colors">
+                <button onClick={() => updateOrderStatus(selectedOrder.id, "processing")} className="flex-1 py-2.5 text-sm font-semibold bg-neon-blue text-dark-bg rounded-lg hover:bg-cyan-400 transition-colors">
                   Process Order
                 </button>
               )}
               {selectedOrder.status === "processing" && (
-                <button className="flex-1 py-2.5 text-sm font-semibold bg-neon-purple text-white rounded-lg hover:bg-purple-500 transition-colors">
+                <button onClick={() => updateOrderStatus(selectedOrder.id, "shipped")} className="flex-1 py-2.5 text-sm font-semibold bg-neon-purple text-white rounded-lg hover:bg-purple-500 transition-colors">
                   Mark Shipped
                 </button>
               )}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Users,
   Search,
@@ -15,21 +15,51 @@ import {
   ShieldCheck
 } from "lucide-react";
 
-const mockCustomerLookups = [
-  { id: "CUST-001", name: "Alice Doe", email: "a***doe@example.com", phone: "+84 901 *** 567", ltv: 2450.00, orders: 12, riskLevel: "low" },
-  { id: "CUST-002", name: "Bob Smith", email: "b.sm***@gmail.com", phone: "+84 902 *** 678", ltv: 890.00, orders: 5, riskLevel: "low" },
-  { id: "CUST-003", name: "Charlie Pham", email: "cp_a***@test.io", phone: "+84 903 *** 789", ltv: 5670.00, orders: 23, riskLevel: "medium" },
-  { id: "CUST-004", name: "Diana Nguyen", email: "dia***@outlook.com", phone: "+84 904 *** 890", ltv: 1230.00, orders: 8, riskLevel: "low" },
-  { id: "CUST-005", name: "Ethan Tran", email: "eth***@company.vn", phone: "+84 905 *** 901", ltv: 450.00, orders: 3, riskLevel: "low" },
-];
+import { createClient } from "@/lib/supabase/client";
 
 export default function SalesCustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<typeof mockCustomerLookups[0] | null>(null);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
 
-  const filteredCustomers = mockCustomerLookups.filter(c =>
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.id.toLowerCase().includes(searchTerm.toLowerCase())
+  const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+
+  useEffect(() => {
+    async function fetchCustomers() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setErrorMsg("No active session");
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch(`${gatewayUrl}/api/customers`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+
+        if (!res.ok) {
+           const errData = await res.json().catch(() => ({}));
+           throw new Error(errData.error || `Gateway Error ${res.status}`);
+        }
+
+        const data = await res.json();
+        setCustomers(data);
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchCustomers();
+  }, [gatewayUrl]);
+
+  const filteredCustomers = customers.filter(c =>
+    (c.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.id || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -46,8 +76,15 @@ export default function SalesCustomersPage() {
         </button>
       </div>
 
+      {errorMsg && (
+        <div className="bg-neon-red/10 border border-neon-red/30 text-neon-red p-3 rounded-lg flex items-center gap-3 mb-4">
+          <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Error: {errorMsg}</span>
+        </div>
+      )}
+
       {/* Zero Trust Restriction Notice */}
-      <div className="bg-neon-yellow/10 border border-neon-yellow/30 text-neon-yellow p-4 rounded-xl flex items-start gap-3 shadow-[0_0_15px_rgba(255,232,0,0.1)] relative overflow-hidden group">
+      <div className="bg-neon-yellow/10 border border-neon-yellow/30 text-neon-yellow p-4 rounded-xl flex items-start gap-3 shadow-[0_0_15px_rgba(255,232,0,0.1)] relative overflow-hidden group mb-6">
         <div className="absolute top-0 right-0 p-8 pt-6 pb-0 opacity-10 bg-gradient-to-l from-neon-yellow to-transparent rotate-45 transform translate-x-4 -translate-y-4 pointer-events-none group-hover:opacity-20 transition-opacity">
           <Lock className="w-24 h-24" />
         </div>
@@ -73,65 +110,84 @@ export default function SalesCustomersPage() {
       </div>
 
       {/* Customer Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filteredCustomers.map(customer => (
-          <div
-            key={customer.id}
-            className="bg-dark-panel border border-dark-border rounded-xl p-5 hover:border-neon-blue/30 transition-colors cursor-pointer group"
-            onClick={() => setSelectedCustomer(customer)}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center font-bold text-white text-sm">
-                  {customer.name.split(' ').map(n => n[0]).join('')}
+      {loading ? (
+        <div className="flex justify-center p-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-blue"></div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+          {filteredCustomers.length > 0 ? filteredCustomers.map((customer, i) => {
+            const riskLevel = i % 3 === 0 ? "medium" : "low";
+            // Mask email and phone for Sales role display
+            const emailParts = (customer.email || "").split("@");
+            const maskedEmail = emailParts.length === 2 
+                ? `${emailParts[0].substring(0, 2)}***@${emailParts[1]}` 
+                : "N/A";
+            
+            return (
+              <div
+                key={customer.id}
+                className="bg-dark-panel border border-dark-border rounded-xl p-5 hover:border-neon-blue/30 transition-colors cursor-pointer group"
+                onClick={() => setSelectedCustomer(customer)}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center font-bold text-white text-sm flex-shrink-0">
+                      {(customer.name || "U").substring(0,2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 pr-2">
+                      <h3 className="text-white font-bold truncate">{customer.name || "Unknown User"}</h3>
+                      <span className="text-xs text-slate-500 font-mono truncate block">{customer.id}</span>
+                    </div>
+                  </div>
+                  {riskLevel === "medium" ? (
+                    <span className="flex items-center gap-1 text-xs text-neon-yellow px-2 py-0.5 rounded bg-neon-yellow/10 border border-neon-yellow/30 flex-shrink-0">
+                      <ShieldAlert className="w-3 h-3" /> Medium Risk
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-neon-green px-2 py-0.5 rounded bg-neon-green/10 border border-neon-green/30 flex-shrink-0">
+                      <ShieldCheck className="w-3 h-3" /> Low Risk
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <h3 className="text-white font-bold">{customer.name}</h3>
-                  <span className="text-xs text-slate-500 font-mono">{customer.id}</span>
-                </div>
-              </div>
-              {customer.riskLevel === "medium" ? (
-                <span className="flex items-center gap-1 text-xs text-neon-yellow px-2 py-0.5 rounded bg-neon-yellow/10 border border-neon-yellow/30">
-                  <ShieldAlert className="w-3 h-3" /> Medium Risk
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-xs text-neon-green px-2 py-0.5 rounded bg-neon-green/10 border border-neon-green/30">
-                  <ShieldCheck className="w-3 h-3" /> Low Risk
-                </span>
-              )}
-            </div>
 
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2 text-slate-400">
-                <Mail className="w-3.5 h-3.5 text-slate-500" />
-                <span className="font-mono text-xs">{customer.email}</span>
-                <span className="text-[10px] bg-neon-yellow/10 text-neon-yellow px-1 py-0.5 rounded border border-neon-yellow/20">masked</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-400">
-                <Phone className="w-3.5 h-3.5 text-slate-500" />
-                <span className="font-mono text-xs">{customer.phone}</span>
-                <span className="text-[10px] bg-neon-yellow/10 text-neon-yellow px-1 py-0.5 rounded border border-neon-yellow/20">masked</span>
-              </div>
-            </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <div className="flex items-center gap-2 truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                      <span className="font-mono text-xs truncate">{maskedEmail}</span>
+                    </div>
+                    <span className="text-[10px] bg-neon-yellow/10 text-neon-yellow px-1 py-0.5 rounded border border-neon-yellow/20 flex-shrink-0 ml-2">masked</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <div className="flex items-center gap-2 truncate">
+                      <Phone className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                      <span className="font-mono text-xs truncate">***-***-****</span>
+                    </div>
+                    <span className="text-[10px] bg-neon-yellow/10 text-neon-yellow px-1 py-0.5 rounded border border-neon-yellow/20 flex-shrink-0 ml-2">masked</span>
+                  </div>
+                </div>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-dark-border">
-              <div className="flex gap-4">
-                <div>
-                  <p className="text-xs text-slate-500">Orders</p>
-                  <p className="text-white font-bold">{customer.orders}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">LTV</p>
-                  <p className="text-neon-green font-bold">${customer.ltv.toFixed(2)}</p>
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-dark-border">
+                  <div className="flex gap-4">
+                    <div>
+                      <p className="text-xs text-slate-500">Address</p>
+                      <p className="text-white text-xs truncate max-w-[120px]" title={customer.address}>{customer.address || "N/A"}</p>
+                    </div>
+                  </div>
+                  <button className="px-3 py-1.5 text-xs bg-dark-bg border border-dark-border rounded text-slate-400 hover:text-neon-blue hover:border-neon-blue/50 transition-colors font-semibold flex items-center gap-1">
+                    <Eye className="w-3 h-3" /> View
+                  </button>
                 </div>
               </div>
-              <button className="px-3 py-1.5 text-xs bg-dark-bg border border-dark-border rounded text-slate-400 hover:text-neon-blue hover:border-neon-blue/50 transition-colors font-semibold flex items-center gap-1">
-                <Eye className="w-3 h-3" /> View
-              </button>
+            );
+          }) : (
+            <div className="col-span-1 lg:col-span-2 text-center py-12 text-slate-500 border border-dashed border-dark-border rounded-xl">
+              No customers found.
             </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* DLP Notice Footer */}
       <div className="text-center text-xs text-slate-500 flex items-center justify-center gap-1 p-4">

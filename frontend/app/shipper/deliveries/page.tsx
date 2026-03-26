@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Truck,
   MapPin,
@@ -13,35 +13,86 @@ import {
   Lock,
   ShieldAlert
 } from "lucide-react";
-
-const initialDeliveries = [
-  { id: "DLV-901", address: "123 Tech Avenue, Block B, Floor 4, HCMC", status: "pending" as const, time: "", priority: "normal", distance: "3.2 km" },
-  { id: "DLV-902", address: "45 Cyber Street, Unit 2A, Hanoi", status: "pending" as const, time: "", priority: "urgent", distance: "5.8 km" },
-  { id: "DLV-903", address: "89 Cloud Gateway Rd, Da Nang", status: "delivered" as const, time: "10:45 AM", priority: "normal", distance: "1.5 km" },
-  { id: "DLV-904", address: "12 Secure Lane, Building C, Hanoi", status: "in_transit" as const, time: "", priority: "normal", distance: "7.1 km" },
-  { id: "DLV-905", address: "67 Zero Trust Boulevard, Tower A, HCMC", status: "pending" as const, time: "", priority: "urgent", distance: "2.4 km" },
-  { id: "DLV-906", address: "34 Firewall Ave, Suite 101, Da Nang", status: "delivered" as const, time: "09:20 AM", priority: "normal", distance: "4.0 km" },
-  { id: "DLV-907", address: "56 Shield Road, Block D, Hanoi", status: "in_transit" as const, time: "", priority: "normal", distance: "6.3 km" },
-];
+import { createClient } from "@/lib/supabase/client";
 
 type DeliveryStatus = "pending" | "in_transit" | "delivered";
 
 export default function ShipperDeliveriesPage() {
-  const [deliveries, setDeliveries] = useState(initialDeliveries);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const markInTransit = (id: string) => {
-    setDeliveries(deliveries.map(d =>
-      d.id === id ? { ...d, status: "in_transit" as const } : d
-    ));
+  const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+
+  useEffect(() => {
+    async function fetchDeliveries() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setErrorMsg("No active session");
+          setLoading(false);
+          return;
+        }
+        
+        const res = await fetch(`${gatewayUrl}/api/orders`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        });
+        
+        if (!res.ok) {
+           const err = await res.json().catch(() => ({}));
+           throw new Error(err.error || "Failed to fetch deliveries");
+        }
+        
+        const data = await res.json();
+        setDeliveries(data.map((o: any) => ({
+           id: o.id,
+           address: o.shipping_address || "N/A",
+           // API returns any status; if it's 'processing', treat as 'pending' for Shipper UI logic
+           status: o.status === "processing" ? "pending" : o.status, 
+           time: o.status === "delivered" && o.updated_at ? new Date(o.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+           priority: "normal",
+           distance: "Unknown"
+        })));
+      } catch (e: any) {
+        setErrorMsg(e.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchDeliveries();
+  }, [gatewayUrl]);
+
+  const updateDeliveryStatus = async (id: string, newStatus: string) => {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`${gatewayUrl}/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { 
+           "Content-Type": "application/json",
+           Authorization: `Bearer ${session.access_token}` 
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update delivery status");
+      }
+      
+      setDeliveries(deliveries.map(d =>
+        d.id === id ? { ...d, status: newStatus as DeliveryStatus, time: newStatus === "delivered" ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.time } : d
+      ));
+    } catch (e: any) {
+      alert("Error: " + e.message);
+    }
   };
 
-  const markDelivered = (id: string) => {
-    setDeliveries(deliveries.map(d =>
-      d.id === id ? { ...d, status: "delivered" as const, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) } : d
-    ));
-  };
+  const markInTransit = (id: string) => updateDeliveryStatus(id, "in_transit");
+  const markDelivered = (id: string) => updateDeliveryStatus(id, "delivered");
 
   const filteredDeliveries = deliveries.filter(d => {
     const matchSearch = d.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -130,8 +181,19 @@ export default function ShipperDeliveriesPage() {
       </div>
 
       {/* Deliveries List */}
+      {errorMsg && (
+        <div className="bg-neon-red/10 border border-neon-red/30 text-neon-red p-3 rounded-lg flex items-center gap-3">
+          <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Error: {errorMsg}</span>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4">
-        {filteredDeliveries.map(delivery => {
+        {loading ? (
+          <div className="flex justify-center p-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neon-green"></div>
+          </div>
+        ) : filteredDeliveries.length > 0 ? (
+          filteredDeliveries.map(delivery => {
           const statusInfo = getStatusInfo(delivery.status);
           return (
             <div key={delivery.id} className={`bg-dark-panel border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${delivery.status === 'delivered' ? 'border-neon-green/20 opacity-70' : delivery.status === 'in_transit' ? 'border-neon-blue/30' : 'border-dark-border hover:border-slate-600'}`}>
@@ -194,7 +256,12 @@ export default function ShipperDeliveriesPage() {
               </div>
             </div>
           );
-        })}
+        })
+      ) : (
+        <div className="text-center py-12 text-slate-500 border border-dashed border-dark-border rounded-xl">
+          No deliveries found.
+        </div>
+      )}
       </div>
     </div>
   );

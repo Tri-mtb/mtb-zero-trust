@@ -21,42 +21,50 @@ import {
   UserCheck
 } from "lucide-react";
 
-const mockSystemUsers = [
-  { id: "USR-001", name: "Nguyen Admin", email: "admin@trustguard.ai", role: "admin", status: "active", lastLogin: "2 mins ago", clearance: 3, riskScore: 5 },
-  { id: "USR-002", name: "Tran Sales", email: "sales@trustguard.ai", role: "sales", status: "active", lastLogin: "15 mins ago", clearance: 2, riskScore: 12 },
-  { id: "USR-003", name: "Le Shipper", email: "shipper@trustguard.ai", role: "shipper", status: "active", lastLogin: "1 hour ago", clearance: 1, riskScore: 8 },
-  { id: "USR-004", name: "Pham Staff", email: "staff2@trustguard.ai", role: "sales", status: "suspended", lastLogin: "3 days ago", clearance: 2, riskScore: 92 },
-  { id: "USR-005", name: "Ho Admin", email: "admin2@trustguard.ai", role: "admin", status: "active", lastLogin: "30 mins ago", clearance: 3, riskScore: 3 },
-];
-
-const mockCustomers = [
-  { id: "CUST-001", name: "Alice Doe", email: "alice@corp.net", phone: "+84 901 234 567", address: "123 Tech Avenue, HCMC", totalOrders: 12, ltv: 2450.00 },
-  { id: "CUST-002", name: "Bob Smith", email: "b.smith@gmail.com", phone: "+84 902 345 678", address: "45 Cyber Street, Hanoi", totalOrders: 5, ltv: 890.00 },
-  { id: "CUST-003", name: "Charlie Pham", email: "cp_admin@test.io", phone: "+84 903 456 789", address: "89 Cloud Gateway Rd, Da Nang", totalOrders: 23, ltv: 5670.00 },
-  { id: "CUST-004", name: "Diana Nguyen", email: "diana.n@outlook.com", phone: "+84 904 567 890", address: "67 Zero Trust Blvd, HCMC", totalOrders: 8, ltv: 1230.00 },
-  { id: "CUST-005", name: "Ethan Tran", email: "ethan.t@company.vn", phone: "+84 905 678 901", address: "12 Secure Lane, Hanoi", totalOrders: 3, ltv: 450.00 },
-];
-
 export default function UsersPage() {
   const [activeTab, setActiveTab] = useState<"system" | "customers">("system");
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [customers, setCustomers] = useState<any[]>([]);
+  const [systemUsers, setSystemUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchCustomers() {
+    async function fetchData() {
+      setLoading(true);
+      setErrorMsg(null);
       try {
         const { createClient } = await import("@/lib/supabase/client");
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (!session) return;
+        if (!session) {
+           setErrorMsg("No active session");
+           setLoading(false);
+           return;
+        }
         
         const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
-        const res = await fetch(`${gatewayUrl}/api/customers`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        });
-        if (res.ok) {
+        
+        if (activeTab === "system") {
+           const res = await fetch(`${gatewayUrl}/api/admin/users`, {
+              headers: { Authorization: `Bearer ${session.access_token}` }
+           });
+           if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || `Error ${res.status}`);
+           }
+           const data = await res.json();
+           setSystemUsers(data);
+        } else if (activeTab === "customers") {
+           const res = await fetch(`${gatewayUrl}/api/customers`, {
+             headers: { Authorization: `Bearer ${session.access_token}` }
+           });
+           if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || `Error ${res.status}`);
+           }
            const data = await res.json();
            setCustomers(data.map((c: any) => ({
               id: c.id,
@@ -68,17 +76,17 @@ export default function UsersPage() {
               ltv: c.ltv || 0
            })));
         }
-      } catch (e) {
-        console.error(e);
+      } catch (e: any) {
+        setErrorMsg(e.message);
+      } finally {
+        setLoading(false);
       }
     }
-    if (activeTab === "customers") {
-       fetchCustomers();
-    }
+    fetchData();
   }, [activeTab]);
 
-  const filteredUsers = mockSystemUsers.filter(u => {
-    const matchSearch = String(u.name).toLowerCase().includes(searchTerm.toLowerCase()) || String(u.email).toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredUsers = systemUsers.filter(u => {
+    const matchSearch = String(u.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || String(u.email || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchRole = roleFilter === "all" || u.role === roleFilter;
     return matchSearch && matchRole;
   });
@@ -97,6 +105,10 @@ export default function UsersPage() {
     return styles[role] || styles.customer;
   };
 
+  const handleFeatureNotImplemented = () => {
+    alert("Zero Trust Policy: This administrative action is currently restricted or under development. Please contact Senior Admin.");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -104,10 +116,17 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-white tracking-wide">Users & Customers</h1>
           <p className="text-slate-400 text-sm mt-1">Identity Management & Access Control</p>
         </div>
-        <button className="px-4 py-2 bg-neon-blue text-dark-bg font-bold rounded-lg text-sm hover:bg-cyan-400 transition-colors flex items-center gap-2">
+        <button onClick={handleFeatureNotImplemented} className="px-4 py-2 bg-neon-blue text-dark-bg font-bold rounded-lg text-sm hover:bg-cyan-400 transition-colors flex items-center gap-2">
           <UserPlus className="w-4 h-4" /> Add User
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="bg-neon-red/10 border border-neon-red/30 text-neon-red p-3 rounded-lg flex items-center gap-3">
+          <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm font-medium">Error: {errorMsg}</span>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex gap-1 bg-dark-panel border border-dark-border rounded-xl p-1">
@@ -115,7 +134,7 @@ export default function UsersPage() {
           onClick={() => { setActiveTab("system"); setSearchTerm(""); setRoleFilter("all"); }}
           className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${activeTab === "system" ? "bg-neon-blue/10 text-neon-blue border border-neon-blue/30" : "text-slate-400 hover:text-white"}`}
         >
-          <Shield className="w-4 h-4" /> System Users ({mockSystemUsers.length})
+          <Shield className="w-4 h-4" /> System Users ({systemUsers.length})
         </button>
         <button 
           onClick={() => { setActiveTab("customers"); setSearchTerm(""); }}
@@ -167,16 +186,24 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-border">
-              {filteredUsers.map(user => (
+              {loading && filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-neon-blue mx-auto mb-2"></div>
+                    Loading System Users...
+                  </td>
+                </tr>
+              ) : filteredUsers.length > 0 ? (
+                filteredUsers.map(user => (
                 <tr key={user.id} className="hover:bg-dark-bg/50 transition-colors">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${user.status === 'active' ? 'bg-slate-800 text-white' : 'bg-red-500/10 text-red-400'}`}>
-                        {user.name.charAt(0)}
+                        {(user.name && user.name.length > 0) ? user.name.charAt(0).toUpperCase() : '?'}
                       </div>
-                      <div>
-                        <p className="text-white font-medium">{user.name}</p>
-                        <p className="text-xs text-slate-500 font-mono">{user.email}</p>
+                      <div className="min-w-0 pr-2 max-w-[150px]">
+                        <p className="text-white font-medium truncate" title={user.name}>{user.name}</p>
+                        <p className="text-xs text-slate-500 font-mono truncate" title={user.email}>{user.email}</p>
                       </div>
                     </div>
                   </td>
@@ -188,10 +215,10 @@ export default function UsersPage() {
                   <td className="px-5 py-4">
                     <div className="flex gap-0.5">
                       {[1, 2, 3].map(lvl => (
-                        <div key={lvl} className={`w-4 h-1.5 rounded-full ${lvl <= user.clearance ? 'bg-neon-blue' : 'bg-slate-700'}`} />
+                        <div key={lvl} className={`w-4 h-1.5 rounded-full ${lvl <= (user.clearance || 1) ? 'bg-neon-blue' : 'bg-slate-700'}`} />
                       ))}
                     </div>
-                    <span className="text-xs text-slate-500 mt-1 block">Level {user.clearance}</span>
+                    <span className="text-xs text-slate-500 mt-1 block">Level {user.clearance || 1}</span>
                   </td>
                   <td className="px-5 py-4">
                     {user.status === "active" ? (
@@ -218,22 +245,29 @@ export default function UsersPage() {
                   <td className="px-5 py-4 text-xs text-slate-400">{user.lastLogin}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
-                      <button className="p-1.5 hover:bg-dark-bg rounded text-slate-400 hover:text-neon-blue transition-colors" title="View Details">
+                      <button onClick={handleFeatureNotImplemented} className="p-1.5 hover:bg-dark-bg rounded text-slate-400 hover:text-neon-blue transition-colors" title="View Details">
                         <Eye className="w-4 h-4" />
                       </button>
                       {user.status === 'active' ? (
-                        <button className="p-1.5 hover:bg-neon-red/10 rounded text-slate-400 hover:text-neon-red transition-colors" title="Suspend User">
+                        <button onClick={handleFeatureNotImplemented} className="p-1.5 hover:bg-neon-red/10 rounded text-slate-400 hover:text-neon-red transition-colors" title="Suspend User">
                           <UserX className="w-4 h-4" />
                         </button>
                       ) : (
-                        <button className="p-1.5 hover:bg-neon-green/10 rounded text-slate-400 hover:text-neon-green transition-colors" title="Reactivate User">
+                        <button onClick={handleFeatureNotImplemented} className="p-1.5 hover:bg-neon-green/10 rounded text-slate-400 hover:text-neon-green transition-colors" title="Reactivate User">
                           <UserCheck className="w-4 h-4" />
                         </button>
                       )}
                     </div>
                   </td>
                 </tr>
-              ))}
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="px-5 py-8 text-center text-slate-500 border-t border-dashed border-dark-border">
+                    No system users found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -129,7 +129,7 @@ async def evaluate_risk(context: ContextRequest):
             
         # AI RBAC / Level-based Access Control
         def get_role_level(r):
-            levels = {"user": 1, "customer": 1, "staff": 2, "admin": 3, "manager": 4}
+            levels = {"user": 1, "customer": 1, "staff": 2, "sales": 2, "shipper": 2, "admin": 3, "manager": 4}
             return levels.get(r.lower(), 0)
             
         def get_endpoint_level(ep):

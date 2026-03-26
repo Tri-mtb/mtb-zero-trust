@@ -156,14 +156,51 @@ app.get('/api/admin/export-customers', async (req, res) => {
     res.json({ message: 'Export successful', data: customers, count: customers.length });
 });
 
+// Endpoint: System Users (Admin only)
+app.get('/api/admin/users', async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only Admins can view system users' });
+    }
+    
+    // We fetch all profiles from the public schema
+    const { data: profiles, error } = await supabase.from('profiles').select('*');
+    if (error) return res.status(500).json({ error: error.message });
+    
+    // Attempt to enrich with auth.users if service role is used (optional, requires superuser privileges)
+    let authUsers = [];
+    try {
+        const { data: authData } = await supabase.auth.admin.listUsers();
+        if (authData && authData.users) {
+            authUsers = authData.users;
+        }
+    } catch(e) { /* ignore if not service role */ }
+    
+    const users = profiles.map(p => {
+        const authUser = authUsers.find(u => u.id === p.id);
+        const email = authUser ? authUser.email : (p.username || 'user-' + p.id.substring(0,4) + '@trustguard.ai');
+        return {
+            id: p.id,
+            name: p.full_name || 'Unknown User',
+            email: email,
+            role: p.role || 'customer',
+            status: 'active', // assuming active
+            lastLogin: authUser?.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleDateString() : 'Recently',
+            clearance: p.clearance_level || (p.role === 'admin' ? 3 : p.role === 'staff' || p.role === 'sales' ? 2 : 1),
+            riskScore: Math.floor(Math.random() * 15) // mock risk component
+        };
+    });
+    
+    res.json(users);
+});
+
 // Endpoint 5: Update Order Status
 app.patch('/api/orders/:id', async (req, res) => {
     const role = req.user.role;
     
     if (role === 'shipper') {
-        // Shipper can only update to 'delivered'
-        if (req.body.status !== 'delivered') {
-            return res.status(403).json({ error: 'Shippers can only mark orders as delivered' });
+        // Shipper can only update to 'in_transit' or 'delivered'
+        if (req.body.status !== 'delivered' && req.body.status !== 'in_transit') {
+            return res.status(403).json({ error: 'Shippers can only mark orders as in_transit or delivered' });
         }
     }
 

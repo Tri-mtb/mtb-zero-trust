@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Lock, 
   Search, 
@@ -9,9 +9,51 @@ import {
   AlertTriangle,
   FileX
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SalesDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [orders, setOrders] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setErrorMsg("No active session");
+          setLoading(false);
+          return;
+        }
+
+        const [ordRes, custRes] = await Promise.all([
+           fetch(`${gatewayUrl}/api/orders`, { headers: { Authorization: `Bearer ${session.access_token}` } }),
+           fetch(`${gatewayUrl}/api/customers`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+        ]);
+
+        if (ordRes.ok) setOrders(await ordRes.json());
+        if (custRes.ok) setCustomers(await custRes.json());
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [gatewayUrl]);
+
+  const searchedCustomer = searchTerm.length >= 3 
+    ? customers.find(c => 
+        (c.email || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (c.id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -64,28 +106,39 @@ export default function SalesDashboard() {
             />
           </div>
 
-          {searchTerm.length > 3 ? (
-            <div className="p-4 bg-dark-bg border border-dark-border rounded-lg relative">
-              <div className="flex justify-between items-center border-b border-dark-border pb-3 mb-3">
-                <div>
-                  <h4 className="font-bold text-white">Alice Doe</h4>
-                  <span className="text-xs font-mono text-slate-400">UID: CUST-88902</span>
+          {searchTerm.length >= 3 ? (
+            searchedCustomer ? (
+              <div className="p-4 bg-dark-bg border border-dark-border rounded-lg relative">
+                <div className="flex justify-between items-center border-b border-dark-border pb-3 mb-3">
+                  <div className="min-w-0 pr-2">
+                    <h4 className="font-bold text-white truncate text-sm">{searchedCustomer.name}</h4>
+                    <span className="text-xs font-mono text-slate-400 truncate block mt-0.5">UID: {searchedCustomer.id}</span>
+                  </div>
+                  <span className="text-xs px-2 py-1 bg-green-500/10 text-green-400 rounded border border-green-500/20 flex-shrink-0">Active Account</span>
                 </div>
-                <span className="text-xs px-2 py-1 bg-green-500/10 text-green-400 rounded border border-green-500/20">Active Account</span>
+                <div className="space-y-2 text-sm">
+                  <p className="flex justify-between text-slate-400 items-center gap-2">Email: <span className="text-white truncate font-mono text-xs">{
+                      searchedCustomer.email?.split("@").length === 2 
+                        ? `${searchedCustomer.email.split("@")[0].substring(0, 2)}***@${searchedCustomer.email.split("@")[1]}` 
+                        : "N/A"
+                    }</span></p>
+                  <p className="flex justify-between text-slate-400 items-center gap-2">Phone: <span className="text-white font-mono text-xs">***-***-****</span></p>
+                  <p className="flex justify-between text-slate-400 items-start gap-2">Address: <span className="text-white truncate text-xs text-right max-w-[150px]" title={searchedCustomer.address}>{searchedCustomer.address || "N/A"}</span></p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-dark-border/50 text-xs text-slate-500 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-neon-yellow flex-shrink-0" /> PII masked via Data Loss Prevention policy.
+                </div>
               </div>
-              <div className="space-y-2 text-sm">
-                <p className="flex justify-between text-slate-400">Email: <span className="text-white">a***doe@example.com</span></p>
-                <p className="flex justify-between text-slate-400">Phone: <span className="text-white">+1 (555) ***-**89</span></p>
-                <p className="flex justify-between text-slate-400">LTV: <span className="text-white">$1,490.00</span></p>
+            ) : (
+              <div className="p-8 text-center text-slate-500 border border-dashed border-dark-border rounded-lg bg-dark-bg/50">
+                <Search className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">No customer found for `{searchTerm}`.</p>
               </div>
-              <div className="mt-4 pt-3 border-t border-dark-border/50 text-xs text-slate-500 flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-neon-yellow" /> PII masked via Data Loss Prevention policy.
-              </div>
-            </div>
+            )
           ) : (
             <div className="p-8 text-center text-slate-500 border border-dashed border-dark-border rounded-lg bg-dark-bg/50">
               <Search className="w-8 h-8 mx-auto mb-2 opacity-20" />
-              <p className="text-sm">Type to perform strict single-entity lookup.</p>
+              <p className="text-sm">Type at least 3 characters for strict entity lookup.</p>
             </div>
           )}
         </div>
@@ -101,22 +154,41 @@ export default function SalesDashboard() {
             </div>
           </div>
 
+          {errorMsg && (
+            <div className="mb-4 bg-neon-red/10 border border-neon-red/30 text-neon-red p-3 rounded-lg flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-medium">Error: {errorMsg}</span>
+            </div>
+          )}
           <div className="space-y-3">
-            {[1, 2, 3, 4].map(idx => (
-              <div key={idx} className="flex justify-between items-center p-3 bg-dark-bg border border-dark-border rounded-lg hover:border-neon-purple/50 transition-colors cursor-pointer group">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-8 rounded-full bg-neon-purple/50 group-hover:bg-neon-purple transition-colors"></div>
-                  <div>
-                    <p className="text-sm font-bold text-white font-mono">ORD-{800 + idx}</p>
-                    <p className="text-xs text-slate-400 line-clamp-1">Processing Payment</p>
+            {loading ? (
+              <div className="p-4 text-center text-slate-500">Loading orders...</div>
+            ) : orders.length > 0 ? orders.slice(0, 5).map((order) => {
+              const itemsCount = order.order_items?.length || 0;
+              return (
+                <div key={order.id} className="flex justify-between items-center p-3 bg-dark-bg border border-dark-border rounded-lg hover:border-neon-purple/50 transition-colors cursor-pointer group">
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                    <div className="w-2 h-8 rounded-full bg-neon-purple/50 group-hover:bg-neon-purple transition-colors flex-shrink-0"></div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white font-mono truncate" title={order.id}>{order.id}</p>
+                      <p className={`text-xs capitalize flex items-center gap-1 mt-0.5 ${
+                        order.status === 'delivered' ? 'text-neon-green' : 
+                        order.status === 'processing' ? 'text-neon-blue' :
+                        order.status === 'cancelled' ? 'text-neon-red' :
+                        'text-neon-yellow'
+                      }`}>
+                        {order.status}
+                        {order.status === 'pending' && <span className="w-1.5 h-1.5 rounded-full bg-neon-yellow animate-pulse ml-1"></span>}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-bold text-white">${(order.total_amount || 0).toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">{itemsCount} items</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">${200 * idx}.00</p>
-                  <p className="text-xs text-slate-500">2 items</p>
-                </div>
-              </div>
-            ))}
+              );
+            }) : <div className="p-4 text-center text-slate-500">No active orders found.</div>}
           </div>
         </div>
 
