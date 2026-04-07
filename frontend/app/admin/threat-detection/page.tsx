@@ -61,9 +61,11 @@ export default function ThreatDetectionPanel() {
                     geo: "Resolved by AI",
                     time: new Date(l.action_time).toLocaleTimeString(),
                     events: logs.filter((log: any) => log.user_id === l.user_id).slice(0, 10).map((log: any) => ({
+                       id: log.id,
                        time: new Date(log.action_time).toLocaleTimeString(),
                        msg: `${log.method} ${log.endpoint}`,
-                       type: log.decision === 'block' ? 'block' : log.decision === 'alert' ? 'critical' : 'ai'
+                       type: log.decision === 'block' ? 'block' : log.decision === 'alert' ? 'critical' : 'ai',
+                       admin_feedback: log.admin_feedback
                     }))
                  };
               }
@@ -81,6 +83,48 @@ export default function ThreatDetectionPanel() {
     }
     fetchData();
   }, []);
+
+  const [feedbackLoading, setFeedbackLoading] = useState<string | null>(null);
+
+  const submitFeedback = async (logId: string, isAnomalyConfirmed: boolean) => {
+    try {
+      setFeedbackLoading(logId);
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+      const res = await fetch(`${gatewayUrl}/api/access-logs/${logId}/feedback`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ isAnomalyConfirmed })
+      });
+
+      if (res.ok) {
+         // Mutate state locally to avoid full refetch
+         if (selectedUser) {
+           const newEvents = selectedUser.events.map((ev: any) => 
+               ev.id === logId ? { ...ev, admin_feedback: isAnomalyConfirmed ? "confirmed_threat" : "marked_safe" } : ev
+           );
+           setSelectedUser({ ...selectedUser, events: newEvents });
+           const updatedRiskUsers = riskUsers.map(u => 
+               u.id === selectedUser.id ? { ...u, events: newEvents } : u
+           );
+           setRiskUsers(updatedRiskUsers);
+         }
+      } else {
+         alert("Lỗi khi gửi feedback tới API/AI Engine.");
+      }
+    } catch(e) {
+      console.error(e);
+      alert("Lỗi mạng khi cập nhật AI Feedback.");
+    } finally {
+      setFeedbackLoading(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -226,6 +270,29 @@ export default function ThreatDetectionPanel() {
                       <div className="bg-dark-bg border border-dark-border rounded-lg p-3 flex-1 mb-2">
                         <span className="text-xs text-slate-500 font-mono block mb-1">{ev.time}</span>
                         <span className={`text-sm tracking-wide ${ev.type === 'block' ? 'text-neon-red font-bold' : 'text-slate-300'}`}>{ev.msg}</span>
+                        
+                        {/* AI Feedback Actions */}
+                        <div className="flex gap-2 mt-3 pt-2 border-t border-dark-border/50">
+                           {ev.admin_feedback === 'marked_safe' && <span className="text-xs px-2 py-1 bg-neon-green/10 text-neon-green border border-neon-green/30 rounded flex items-center gap-1"><Zap className="w-3 h-3"/> AI Override: Marked Safe</span>}
+                           {ev.admin_feedback === 'confirmed_threat' && <span className="text-xs px-2 py-1 bg-neon-red/10 text-neon-red border border-neon-red/30 rounded font-bold flex items-center gap-1"><ShieldAlert className="w-3 h-3"/> AI Override: Confirmed Threat</span>}
+                           
+                           {!ev.admin_feedback && (
+                             <>
+                               <button 
+                                 disabled={feedbackLoading === ev.id}
+                                 onClick={(e) => { e.stopPropagation(); submitFeedback(ev.id, false); }} 
+                                 className="text-xs px-2 py-1 bg-neon-green/5 text-neon-green border border-neon-green/20 rounded hover:bg-neon-green/20 hover:border-neon-green/50 transition-colors disabled:opacity-50">
+                                 {feedbackLoading === ev.id ? 'Saving...' : 'Mark as Safe'}
+                               </button>
+                               <button 
+                                 disabled={feedbackLoading === ev.id}
+                                 onClick={(e) => { e.stopPropagation(); submitFeedback(ev.id, true); }} 
+                                 className="text-xs px-2 py-1 bg-neon-red/5 text-neon-red border border-neon-red/20 rounded hover:bg-neon-red/20 hover:border-neon-red/50 transition-colors disabled:opacity-50">
+                                 {feedbackLoading === ev.id ? 'Saving...' : 'Confirm Threat'}
+                               </button>
+                             </>
+                           )}
+                        </div>
                       </div>
                     </div>
                   ))}

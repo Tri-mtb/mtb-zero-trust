@@ -77,9 +77,49 @@ def update_and_get_rate(user_id: str, current_time: datetime) -> int:
     
     return len(history)
 
+trusted_users = set()
+blacklisted_users = set()
+
+class FeedbackRequest(BaseModel):
+    log_id: str
+    user_id: str
+    ip_address: str
+    is_anomaly_confirmed: bool
+
+@app.post("/api/feedback")
+async def receive_feedback(feedback: FeedbackRequest):
+    if feedback.is_anomaly_confirmed:
+        blacklisted_users.add(feedback.user_id)
+        if feedback.user_id in trusted_users:
+            trusted_users.remove(feedback.user_id)
+        return {"status": "success", "action": "blacklisted", "user_id": feedback.user_id}
+    else:
+        trusted_users.add(feedback.user_id)
+        if feedback.user_id in blacklisted_users:
+            blacklisted_users.remove(feedback.user_id)
+        return {"status": "success", "action": "whitelisted", "user_id": feedback.user_id}
+
 @app.post("/api/evaluate_risk")
 async def evaluate_risk(context: ContextRequest):
     try:
+        if context.user_id in blacklisted_users:
+            return {
+                "decision": "block",
+                "risk_score": 100.0,
+                "reasons": ["[ADMIN OVERRIDE] User has been explicitly blacklisted due to prior confirmed threat."]
+            }
+        
+        if context.user_id in trusted_users:
+            # Still update rate but return allow
+            time_str = context.time.replace("Z", "+00:00")
+            req_time = datetime.fromisoformat(time_str) if time_str else datetime.now()
+            update_and_get_rate(context.user_id, req_time)
+            
+            return {
+                "decision": "allow",
+                "risk_score": 0.0,
+                "reasons": ["[ADMIN OVERRIDE] User is explicitly marked as safe (Whitelist)."]
+            }
         # Parse ISO string handling potential Z or offset
         time_str = context.time.replace("Z", "+00:00")
         req_time = datetime.fromisoformat(time_str) if time_str else datetime.now()

@@ -230,6 +230,49 @@ app.get('/api/access-logs', async (req, res) => {
     res.json(logs);
 });
 
+// Endpoint 7: AI Feedback Loop (Admin only)
+app.post('/api/access-logs/:id/feedback', async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only Admins can provide AI feedback' });
+    }
+
+    const logId = req.params.id;
+    const { isAnomalyConfirmed } = req.body;
+    
+    // Convert to DB enum string
+    const adminFeedback = isAnomalyConfirmed ? 'confirmed_threat' : 'marked_safe';
+
+    // 1. Update Supabase Database
+    const { data: updatedLog, error: dbError } = await supabase
+        .from('access_logs')
+        .update({ admin_feedback: adminFeedback })
+        .eq('id', logId)
+        .select()
+        .single();
+
+    if (dbError) return res.status(500).json({ error: dbError.message });
+
+    // 2. Notify AI Engine (PDP) to update its Blacklist/Whitelist
+    try {
+        const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:5000';
+        await fetch(`${AI_ENGINE_URL}/api/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                log_id: logId,
+                user_id: updatedLog.user_id,
+                ip_address: updatedLog.ip_address,
+                is_anomaly_confirmed: isAnomalyConfirmed
+            })
+        });
+    } catch (err) {
+        console.warn("Failed to notify AI Engine about feedback:", err.message);
+        return res.json({ message: 'Feedback saved to DB, but AI Engine synchronization failed', data: updatedLog });
+    }
+
+    res.json({ message: 'Feedback successfully synchronized with AI Engine', data: updatedLog });
+});
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
     console.log(`Protected E-commerce API running on port ${PORT}`);
