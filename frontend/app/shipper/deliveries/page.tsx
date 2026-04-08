@@ -9,8 +9,6 @@ import {
   Navigation,
   Package,
   Search,
-  Filter,
-  Lock,
   ShieldAlert
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";

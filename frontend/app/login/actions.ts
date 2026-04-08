@@ -29,7 +29,7 @@ export async function login(formData: FormData) {
         .eq('id', data.user.id)
         .single()
 
-    const userRole = profile?.role || 'customer'
+    const userRole = profile?.role || data.user.user_metadata?.role || 'customer'
 
     revalidatePath('/', 'layout')
 
@@ -51,12 +51,11 @@ export async function signup(formData: FormData) {
 
     const email = formData.get('email') as string
     const password = formData.get('password') as string
-    const requestedRole = formData.get('role') as string || 'customer'
+    
 
     // SECURITY: Server-side validation — prevent role injection
     // Only non-privileged roles are allowed via self-registration
-    const ALLOWED_SIGNUP_ROLES = ['customer', 'sales', 'shipper']
-    const role = ALLOWED_SIGNUP_ROLES.includes(requestedRole) ? requestedRole : 'customer'
+    const role = 'customer'
 
     if (!email || !password) {
         return { error: 'Email and password are required' }
@@ -79,16 +78,7 @@ export async function signup(formData: FormData) {
 
     revalidatePath('/', 'layout')
 
-    // Redirect based on role after signup
-    if (role === 'admin') {
-        redirect('/admin/dashboard')
-    } else if (role === 'sales') {
-        redirect('/sales/dashboard')
-    } else if (role === 'shipper') {
-        redirect('/shipper/dashboard')
-    } else {
-        redirect('/store')
-    }
+    redirect('/store')
 }
 
 export async function logout() {

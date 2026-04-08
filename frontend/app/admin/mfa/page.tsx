@@ -15,40 +15,39 @@ export default function MFAPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    checkMFAStatus();
-  }, []);
+    async function checkMFAStatus() {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        setError("Failed to get user session. Please relogin.");
+        setStatus("unverified");
+        return;
+      }
 
-  const checkMFAStatus = async () => {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) {
-      setError("Failed to get user session. Please relogin.");
-      setStatus("unverified");
-      return;
-    }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData?.session;
+      
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const currentLevel = aalData?.currentLevel;
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData?.session;
-    
-    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const currentLevel = aalData?.currentLevel;
-
-    if (session?.user.factors?.length && session.user.factors.length > 0) {
-      setFactors(session.user.factors);
-      if (currentLevel === "aal2") {
-        setStatus("verified");
+      if (session?.user.factors?.length && session.user.factors.length > 0) {
+        setFactors(session.user.factors);
+        if (currentLevel === "aal2") {
+          setStatus("verified");
+        } else {
+          setStatus("unverified");
+          setFactorId(session.user.factors[0].id);
+          const { error: challengeError } = await supabase.auth.mfa.challenge({ factorId: session.user.factors[0].id });
+          if (challengeError) {
+            setError("Failed to create MFA challenge: " + challengeError.message);
+          }
+        }
       } else {
         setStatus("unverified");
-        // They have factors but session is AAL1. We need to challenge them.
-        setFactorId(session.user.factors[0].id);
-        const { error: challengeError } = await supabase.auth.mfa.challenge({ factorId: session.user.factors[0].id });
-        if (challengeError) {
-          setError("Failed to create MFA challenge: " + challengeError.message);
-        }
       }
-    } else {
-      setStatus("unverified");
     }
-  };
+
+    void checkMFAStatus();
+  }, [supabase]);
 
   const handleEnroll = async () => {
     setError(null);
@@ -75,7 +74,7 @@ export default function MFAPage() {
   const handleVerifyEnrollment = async () => {
     setError(null);
     try {
-      const { data, error } = await supabase.auth.mfa.challengeAndVerify({
+    const { error } = await supabase.auth.mfa.challengeAndVerify({
         factorId,
         code: verifyCode,
       });
@@ -97,7 +96,7 @@ export default function MFAPage() {
   const handleVerifyChallenge = async () => {
     setError(null);
     try {
-      const { data, error } = await supabase.auth.mfa.challengeAndVerify({
+    const { error } = await supabase.auth.mfa.challengeAndVerify({
         factorId,
         code: verifyCode,
       });

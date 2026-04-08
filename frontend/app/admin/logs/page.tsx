@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { 
   FileText, 
   Search, 
-  Filter, 
   Download,
   ShieldCheck,
   ShieldAlert,
@@ -12,24 +11,10 @@ import {
   Clock,
   Eye,
   RefreshCw,
-  ChevronDown,
   Globe,
   Monitor,
   Cpu
 } from "lucide-react";
-
-const mockAccessLogs = [
-  { id: 1, timestamp: "2026-03-12 20:01:32", user: "admin@trustguard.ai", role: "admin", ip: "192.168.1.10", device: "Windows 11 - Chrome", endpoint: "/api/products", method: "GET", riskScore: 5, decision: "allow", reason: "Normal behavior pattern" },
-  { id: 2, timestamp: "2026-03-12 19:58:45", user: "sales@trustguard.ai", role: "sales", ip: "192.168.1.25", device: "Windows 10 - Firefox", endpoint: "/api/orders", method: "GET", riskScore: 8, decision: "allow", reason: "Known IP, business hours" },
-  { id: 3, timestamp: "2026-03-12 19:55:10", user: "staff_sales2", role: "sales", ip: "103.45.67.89", device: "Unknown OS - Postman", endpoint: "/api/admin/export-customers", method: "GET", riskScore: 92, decision: "block", reason: "Unauthorized admin access, Unknown IP, suspicious rate" },
-  { id: 4, timestamp: "2026-03-12 19:50:22", user: "shipper@trustguard.ai", role: "shipper", ip: "10.0.0.15", device: "Android - Mobile Chrome", endpoint: "/api/orders", method: "GET", riskScore: 15, decision: "allow", reason: "Normal delivery check" },
-  { id: 5, timestamp: "2026-03-12 19:45:01", user: "admin2@trustguard.ai", role: "admin", ip: "45.12.88.200", device: "macOS - Safari", endpoint: "/api/v1/system/config", method: "PUT", riskScore: 68, decision: "alert", reason: "Unusual login time (3:00 AM), Unknown geo-location" },
-  { id: 6, timestamp: "2026-03-12 19:40:33", user: "api_bot_service", role: "service", ip: "10.0.0.5", device: "Linux - Python/3.11", endpoint: "/api/customers", method: "GET", riskScore: 75, decision: "block", reason: "Rapid API requests (>1000/s), Potential data exfiltration" },
-  { id: 7, timestamp: "2026-03-12 19:35:18", user: "sales@trustguard.ai", role: "sales", ip: "192.168.1.25", device: "Windows 10 - Firefox", endpoint: "/api/products", method: "GET", riskScore: 3, decision: "allow", reason: "Normal browsing" },
-  { id: 8, timestamp: "2026-03-12 19:30:05", user: "shipper@trustguard.ai", role: "shipper", ip: "10.0.0.15", device: "Android - Mobile Chrome", endpoint: "/api/customers", method: "GET", riskScore: 88, decision: "block", reason: "Shipper role not authorized for customer data" },
-  { id: 9, timestamp: "2026-03-12 19:25:42", user: "admin@trustguard.ai", role: "admin", ip: "192.168.1.10", device: "Windows 11 - Chrome", endpoint: "/api/admin/export-customers", method: "GET", riskScore: 12, decision: "allow", reason: "Authorized admin export" },
-  { id: 10, timestamp: "2026-03-12 19:20:11", user: "unknown_user77", role: "unknown", ip: "203.99.11.44", device: "Windows - Tor Browser", endpoint: "/api/v1/system/config", method: "DELETE", riskScore: 99, decision: "block", reason: "CRITICAL: Unknown identity, Tor network, destructive method" },
-];
 
 export default function SecurityLogsPage() {
   const [searchTerm, setSearchTerm] = useState("");

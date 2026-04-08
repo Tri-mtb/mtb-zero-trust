@@ -4,7 +4,6 @@ import React, { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { ShoppingBag, Search, Shield, LogOut, ShoppingCart, User, Settings, ChevronDown, X, Trash2, CheckCircle } from "lucide-react";
 import { logout } from "@/app/login/actions";
-import Link from "next/link";
 import Image from "next/image";
 
 interface Product {
@@ -50,7 +49,34 @@ export default function StoreFront() {
   const supabase = createClient();
 
   useEffect(() => {
-    fetchProducts();
+    async function loadProducts() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error("Please log in to view products");
+        }
+
+        const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+        const res = await fetch(`${gatewayUrl}/api/products`, {
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`
+          }
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load products");
+        }
+
+        setProducts(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadProducts();
     
     // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
@@ -60,20 +86,7 @@ export default function StoreFront() {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
-      if (data) {
-        setProducts(data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [supabase]);
 
   const handleAddToCart = (product: Product) => {
     setCartItems(prev => {
@@ -168,10 +181,12 @@ export default function StoreFront() {
           <div className="flex items-center gap-3 sm:gap-6">
             
             {/* Shopping Cart Button */}
-            <button 
-              onClick={() => setIsCartOpen(true)}
-              className="relative p-2 text-slate-400 hover:text-white transition-colors"
-            >
+              <button 
+                onClick={() => setIsCartOpen(true)}
+                aria-label="Open shopping cart"
+                title="Open shopping cart"
+                className="relative p-2 text-slate-400 hover:text-white transition-colors"
+              >
               <ShoppingCart className="w-6 h-6" />
               {cartCount > 0 && (
                 <span className="absolute top-0 right-0 w-5 h-5 bg-neon-blue text-slate-900 font-bold text-xs flex items-center justify-center rounded-full animate-in zoom-in">
@@ -184,6 +199,8 @@ export default function StoreFront() {
             <div className="relative" ref={profileRef}>
               <button 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
+                aria-label={isProfileOpen ? "Close account menu" : "Open account menu"}
+                title={isProfileOpen ? "Close account menu" : "Open account menu"}
                 className="flex items-center gap-2 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-full hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700"
               >
                 <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-300">
@@ -252,6 +269,7 @@ export default function StoreFront() {
                        alt={product.name}
                        fill
                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                       unoptimized
                        className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out opacity-80 group-hover:opacity-100"
                      />
                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80"></div>
@@ -303,6 +321,8 @@ export default function StoreFront() {
               </h2>
               <button 
                 onClick={() => setIsCartOpen(false)}
+                aria-label="Close shopping cart"
+                title="Close shopping cart"
                 className="text-slate-400 hover:text-white transition-colors"
               >
                 <X className="w-6 h-6" />
@@ -336,7 +356,14 @@ export default function StoreFront() {
                     
                     return (
                       <div key={item.product.id} className="flex gap-4 items-center bg-slate-950/50 p-3 rounded-xl border border-slate-800">
-                        <Image src={imageUrl} alt={item.product.name} width={80} height={80} className="w-20 h-20 object-cover rounded-md" />
+                        <Image
+                          src={imageUrl}
+                          alt={item.product.name}
+                          width={80}
+                          height={80}
+                          unoptimized
+                          className="w-20 h-20 object-cover rounded-md"
+                        />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-white font-bold truncate">{item.product.name}</h4>
                           <p className="text-neon-blue font-bold mb-2">${item.product.price.toLocaleString()}</p>
@@ -346,9 +373,14 @@ export default function StoreFront() {
                               <span className="px-3 text-sm text-white font-medium">{item.quantity}</span>
                               <button onClick={() => updateQuantity(item.product.id, 1)} className="px-2 py-1 text-slate-400 hover:text-white">+</button>
                             </div>
-                            <button onClick={() => removeFromCart(item.product.id)} className="text-red-400 hover:text-red-300 p-1">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              <button
+                                onClick={() => removeFromCart(item.product.id)}
+                                aria-label={`Remove ${item.product.name} from cart`}
+                                title={`Remove ${item.product.name} from cart`}
+                                className="text-red-400 hover:text-red-300 p-1"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                           </div>
                         </div>
                       </div>

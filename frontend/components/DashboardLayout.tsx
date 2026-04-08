@@ -17,8 +17,6 @@ import {
   Menu,
   ChevronRight,
   ShieldAlert,
-  Truck,
-  Search,
   Package
 } from "lucide-react";
 import { logout } from "@/app/login/actions";

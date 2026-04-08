@@ -6,16 +6,11 @@ import {
   Shield, 
   Search, 
   UserPlus, 
-  ChevronDown,
-  ShieldCheck,
   ShieldAlert,
   Eye,
-  Lock,
   Mail,
   Phone,
   MapPin,
-  Clock,
-  Filter,
   MoreVertical,
   UserX,
   UserCheck
@@ -29,6 +24,7 @@ export default function UsersPage() {
   const [systemUsers, setSystemUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -107,6 +103,39 @@ export default function UsersPage() {
 
   const handleFeatureNotImplemented = () => {
     alert("Zero Trust Policy: This administrative action is currently restricted or under development. Please contact Senior Admin.");
+  };
+
+  const handlePolicyAction = async (userId: string, action: "block" | "unblock" | "mark-safe") => {
+    try {
+      setActionLoadingId(`${userId}:${action}`);
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
+      const res = await fetch(`${gatewayUrl}/api/admin/users/${userId}/${action}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`
+        }
+      });
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || `Failed to ${action} user`);
+      }
+
+      setSystemUsers((prev) => prev.map((user) =>
+        user.id === userId
+          ? { ...user, policyStatus: action === "block" ? "blocked" : action === "mark-safe" ? "trusted" : "normal" }
+          : user
+      ));
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   return (
@@ -230,6 +259,16 @@ export default function UsersPage() {
                         <span className="w-1.5 h-1.5 rounded-full bg-neon-red" /> Suspended
                       </span>
                     )}
+                    {user.policyStatus === "blocked" && (
+                      <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-neon-red">
+                        <span className="w-1.5 h-1.5 rounded-full bg-neon-red" /> AI Blocked
+                      </span>
+                    )}
+                    {user.policyStatus === "trusted" && (
+                      <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-neon-green">
+                        <span className="w-1.5 h-1.5 rounded-full bg-neon-green" /> Marked Safe
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
@@ -248,15 +287,33 @@ export default function UsersPage() {
                       <button onClick={handleFeatureNotImplemented} className="p-1.5 hover:bg-dark-bg rounded text-slate-400 hover:text-neon-blue transition-colors" title="View Details">
                         <Eye className="w-4 h-4" />
                       </button>
-                      {user.status === 'active' ? (
-                        <button onClick={handleFeatureNotImplemented} className="p-1.5 hover:bg-neon-red/10 rounded text-slate-400 hover:text-neon-red transition-colors" title="Suspend User">
-                          <UserX className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <button onClick={handleFeatureNotImplemented} className="p-1.5 hover:bg-neon-green/10 rounded text-slate-400 hover:text-neon-green transition-colors" title="Reactivate User">
+                      {user.policyStatus === 'blocked' ? (
+                        <button
+                          onClick={() => handlePolicyAction(user.id, "unblock")}
+                          disabled={actionLoadingId === `${user.id}:unblock`}
+                          className="p-1.5 hover:bg-neon-green/10 rounded text-slate-400 hover:text-neon-green transition-colors disabled:opacity-50"
+                          title="Unblock User"
+                        >
                           <UserCheck className="w-4 h-4" />
                         </button>
+                      ) : (
+                        <button
+                          onClick={() => handlePolicyAction(user.id, "block")}
+                          disabled={actionLoadingId === `${user.id}:block`}
+                          className="p-1.5 hover:bg-neon-red/10 rounded text-slate-400 hover:text-neon-red transition-colors disabled:opacity-50"
+                          title="Block User"
+                        >
+                          <UserX className="w-4 h-4" />
+                        </button>
                       )}
+                      <button
+                        onClick={() => handlePolicyAction(user.id, "mark-safe")}
+                        disabled={actionLoadingId === `${user.id}:mark-safe`}
+                        className="p-1.5 hover:bg-neon-green/10 rounded text-slate-400 hover:text-neon-green transition-colors disabled:opacity-50"
+                        title="Mark User Safe"
+                      >
+                        <ShieldAlert className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>

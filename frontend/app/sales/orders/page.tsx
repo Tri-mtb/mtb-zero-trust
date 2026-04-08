@@ -4,14 +4,12 @@ import React, { useState, useEffect } from "react";
 import {
   ShoppingCart,
   Search,
-  Eye,
   Clock,
   Package,
   CheckCircle,
   Truck,
   AlertTriangle,
   Lock,
-  Filter,
   ChevronRight
 } from "lucide-react";
 

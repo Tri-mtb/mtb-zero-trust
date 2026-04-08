@@ -5,7 +5,6 @@ import {
   ShoppingCart, 
   Package, 
   Users, 
-  Settings, 
   DownloadCloud, 
   Plus, 
   ShieldCheck,
@@ -60,8 +59,35 @@ export default function EcommerceAdmin() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    async function loadInitialData() {
+      const token = await fetchAuthToken();
+      if (!token) {
+        setErrorMsg("No active session");
+        return;
+      }
+
+      try {
+        const [prodRes, ordRes, custRes] = await Promise.all([
+          fetch(`${gatewayUrl}/api/products`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${gatewayUrl}/api/orders`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${gatewayUrl}/api/customers`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        
+        if (!prodRes.ok) {
+          const errData = await prodRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Gateway returned ${prodRes.status}`);
+        }
+        
+        setProducts(await prodRes.json());
+        if (ordRes.ok) setOrders(await ordRes.json());
+        if (custRes.ok) setCustomers(await custRes.json());
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      }
+    }
+
+    void loadInitialData();
+  }, [gatewayUrl]);
 
   const handleExportCustomers = async () => {
     try {

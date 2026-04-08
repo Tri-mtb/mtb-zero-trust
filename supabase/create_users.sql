@@ -62,3 +62,14 @@ SELECT u.email, p.role, p.full_name, u.email_confirmed_at
 FROM auth.users u
 LEFT JOIN public.profiles p ON p.id = u.id
 ORDER BY u.created_at;
+-- ============================================================
+-- DEPRECATED
+-- Khong nen dung file nay de seed auth user nua.
+-- Supabase Auth hien tai co them bang/schema noi bo, nen viec INSERT
+-- truc tiep vao auth.users co the tao ra tai khoan dang nhap bi hong.
+--
+-- Thay vao do:
+-- 1. Chay day du migration hoac full_setup.sql
+-- 2. Dat SUPABASE_SERVICE_ROLE_KEY that vao protected-api/.env
+-- 3. Chay: node create_users.js
+-- ============================================================

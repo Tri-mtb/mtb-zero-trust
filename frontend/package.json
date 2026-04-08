@@ -23,6 +23,8 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
     "@tailwindcss/oxide-win32-x64-msvc": "^4.2.1",
     "@tailwindcss/postcss": "^4",
     "@types/estree": "^1.0.8",

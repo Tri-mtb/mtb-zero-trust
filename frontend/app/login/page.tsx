@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Shield, Lock, Fingerprint } from "lucide-react";
+import { Shield, Lock } from "lucide-react";
 import LoginForm from "./LoginForm";
 
 export default function LoginPage() {

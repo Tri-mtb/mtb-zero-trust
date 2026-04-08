@@ -10,7 +10,6 @@ import {
   Eye,
   Mail,
   Phone,
-  MapPin,
   ShieldAlert,
   ShieldCheck
 } from "lucide-react";
@@ -22,7 +21,7 @@ export default function SalesCustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [, setSelectedCustomer] = useState<any | null>(null);
 
   const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:8080";
 

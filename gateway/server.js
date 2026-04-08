@@ -42,6 +42,11 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Target servers
 const PROTECTED_API_URL = process.env.PROTECTED_API_URL || 'http://localhost:4000';
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:5000';
+const INTERNAL_GATEWAY_SECRET = process.env.INTERNAL_GATEWAY_SECRET;
+
+if (!INTERNAL_GATEWAY_SECRET) {
+    throw new Error('Missing INTERNAL_GATEWAY_SECRET in gateway/.env');
+}
 
 // Real-world, this would hit the actual Supabase endpoints to verify JWT
 // For simplicity and 2FA flow, let's assume valid session token is passed in header
@@ -154,14 +159,21 @@ app.use(async (req, res, next) => {
 app.use(async (req, res) => {
     try {
         const url = `${PROTECTED_API_URL}${req.originalUrl}`;
+        const forwardedHeaders = { ...req.headers };
+
+        delete forwardedHeaders['x-user-id'];
+        delete forwardedHeaders['x-user-role'];
+        delete forwardedHeaders['x-gateway-secret'];
+
         const targetReq = {
             method: req.method,
             url: url,
             headers: {
-                ...req.headers,
-                // Inject Context!
+                ...forwardedHeaders,
+                // Inject trusted context!
                 'x-user-id': req.gatewayContext.userId,
-                'x-user-role': req.gatewayContext.role
+                'x-user-role': req.gatewayContext.role,
+                'x-gateway-secret': INTERNAL_GATEWAY_SECRET
             },
             data: req.body
         };

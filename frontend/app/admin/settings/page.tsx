@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   Server,
   Database,
-  Wifi,
   Key
 } from "lucide-react";
 

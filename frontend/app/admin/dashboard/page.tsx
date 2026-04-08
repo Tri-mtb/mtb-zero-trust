@@ -11,33 +11,7 @@ import {
   Server,
   RefreshCw
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-
-const mockAiAnomalyData = [
-  { time: '00:00', score: 12, threshold: 75 },
-  { time: '04:00', score: 15, threshold: 75 },
-  { time: '08:00', score: 28, threshold: 75 },
-  { time: '12:00', score: 45, threshold: 75 },
-  { time: '16:00', score: 85, threshold: 75 }, // Spike
-  { time: '20:00', score: 32, threshold: 75 },
-  { time: '24:00', score: 18, threshold: 75 },
-];
-
-const mockBehaviorData = [
-  { name: 'Mon', normal: 4000, abnormal: 240 },
-  { name: 'Tue', normal: 3000, abnormal: 139 },
-  { name: 'Wed', normal: 2000, abnormal: 980 }, // Anomaly Day
-  { name: 'Thu', normal: 2780, abnormal: 390 },
-  { name: 'Fri', normal: 1890, abnormal: 480 },
-  { name: 'Sat', normal: 2390, abnormal: 380 },
-  { name: 'Sun', normal: 3490, abnormal: 430 },
-];
-
-const suspiciousAlerts = [
-  { id: 1, user: 'staff_092', location: 'Russia (VPN)', score: 92, status: 'Blocked', time: '10 mins ago' },
-  { id: 2, user: 'admin_sys', location: 'Unknown Device', score: 85, status: 'MFA Challenged', time: '25 mins ago' },
-  { id: 3, user: 'buyer_77', location: 'China', score: 78, status: 'Investigating', time: '1 hour ago' },
-];
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 // TypeScript interfaces for API data
 interface AccessLog {
@@ -50,6 +24,39 @@ interface AccessLog {
   action_time: string;
   risk_score: number;
   decision: 'allow' | 'alert' | 'block';
+}
+
+function buildWeeklyBehaviorData(logs: AccessLog[]) {
+  const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const now = new Date();
+  const buckets = Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(now);
+    date.setDate(now.getDate() - (6 - offset));
+
+    return {
+      key: date.toISOString().slice(0, 10),
+      name: dayLabels[date.getDay()],
+      normal: 0,
+      abnormal: 0,
+    };
+  });
+
+  const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+  logs.forEach((log) => {
+    const key = new Date(log.action_time).toISOString().slice(0, 10);
+    const bucket = bucketMap.get(key);
+    if (!bucket) return;
+
+    if (log.decision === 'allow') {
+      bucket.normal += 1;
+      return;
+    }
+
+    bucket.abnormal += 1;
+  });
+
+  return buckets;
 }
 
 export default function SecurityDashboard() {
@@ -92,6 +99,7 @@ export default function SecurityDashboard() {
   const avgTrustScore = logs.length > 0 
     ? (100 - (logs.reduce((acc, curr) => acc + (curr.risk_score || 0), 0) / logs.length)).toFixed(1) 
     : "94.2";
+  const behaviorData = buildWeeklyBehaviorData(logs);
 
   return (
     <div className="space-y-6">
@@ -143,7 +151,7 @@ export default function SecurityDashboard() {
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockBehaviorData}>
+              <AreaChart data={behaviorData}>
                 <defs>
                   <linearGradient id="colorNormal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#00f0ff" stopOpacity={0.3}/>

@@ -19,7 +19,7 @@
 body {
   background-color: var(--color-dark-bg);
   color: #f8fafc;
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, Helvetica, sans-serif;
 }
 
 /* Custom Utilities for Neon Glow */

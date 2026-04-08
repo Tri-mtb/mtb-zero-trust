@@ -122,16 +122,8 @@ export default function LoginForm() {
                 )}
 
                 {mode === 'signup' && (
-                    <div className="pt-1">
-                        <select
-                            id="role"
-                            name="role"
-                            className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm font-medium appearance-none"
-                        >
-                            <option value="customer">Role: Customer</option>
-                            <option value="sales">Role: Sales representative</option>
-                            <option value="shipper">Role: Logistics (Shipper)</option>
-                        </select>
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
+                        New accounts are created as <span className="font-semibold text-slate-200">customers</span>. Internal roles are assigned by administrators.
                     </div>
                 )}
 
