@@ -34,6 +34,33 @@ export async function updateSession(request: NextRequest) {
     const unprotectedRoutes = ['/', '/login', '/signup', '/auth/callback']
     const isAuthRoute = unprotectedRoutes.includes(request.nextUrl.pathname)
     const isLoginSignup = ['/login', '/signup'].includes(request.nextUrl.pathname)
+    const pathname = request.nextUrl.pathname
+
+    let resolvedRole: string | null = null
+
+    async function getResolvedRole() {
+        if (!user) {
+            return 'customer'
+        }
+
+        if (resolvedRole) {
+            return resolvedRole
+        }
+
+        resolvedRole = user.user_metadata?.role || null
+        if (resolvedRole) {
+            return resolvedRole
+        }
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        resolvedRole = profile?.role || 'customer'
+        return resolvedRole
+    }
 
     function redirectWithCookies(url: URL) {
         const response = NextResponse.redirect(url)
@@ -51,14 +78,7 @@ export async function updateSession(request: NextRequest) {
 
     // If user is logged in and tries to go to login page, redirect to their role-based dashboard
     if (user && isLoginSignup) {
-        // Fetch user profile to get their role
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        const role = profile?.role || user.user_metadata?.role || 'customer'
+        const role = await getResolvedRole()
         const url = request.nextUrl.clone()
 
         if (role === 'sales') {
@@ -77,15 +97,8 @@ export async function updateSession(request: NextRequest) {
 
     // Role-based Access Control (RBAC) for protected routes
     if (user && !isAuthRoute) {
-        const pathname = request.nextUrl.pathname;
         if (pathname.startsWith('/admin') || pathname.startsWith('/sales') || pathname.startsWith('/shipper') || pathname.startsWith('/store')) {
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', user.id)
-                .single()
-
-            const role = profile?.role || user.user_metadata?.role || 'customer'
+            const role = await getResolvedRole()
             
             // Allow admin to access everything for convenience, or restrict strictly?
             // Strict restriction as requested in Zero Trust!

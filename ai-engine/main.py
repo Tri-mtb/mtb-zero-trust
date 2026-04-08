@@ -1,6 +1,7 @@
 from datetime import datetime
 import ipaddress
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,23 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.ensemble import IsolationForest
+
+
+def load_env_file() -> None:
+    env_path = Path(__file__).with_name(".env")
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env_file()
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -368,7 +386,6 @@ async def evaluate_risk(context: ContextRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)
-
+    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=False)
 
 
