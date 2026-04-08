@@ -135,6 +135,9 @@ def train_mock_model():
         "is_known_ip": is_known_ip,
     })
 
+
+
+
     trained_model = IsolationForest(contamination=0.01, random_state=42)
     trained_model.fit(x_train)
     return trained_model
